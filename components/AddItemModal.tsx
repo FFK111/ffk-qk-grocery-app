@@ -1,3 +1,5 @@
+import { db } from '../firebase';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import React, { useState, useMemo } from 'react';
 import type { GroceryItem, PredefinedGroceries } from '../types';
 import { XIcon } from './icons/XIcon';
@@ -56,7 +58,26 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAddItem, 
                                <button
                                    key={item}
                                    type="button"
-                                   onClick={() => setName(item)}
+                                   onClick={async () => {
+  setName(item);
+
+  if (!itemQuantity || !itemUnit || !selectedCategory || !selectedUser) {
+    console.log("Missing fields — not saving");
+    return;
+  }
+
+  await addDoc(collection(db, 'groceryItems'), {
+    name: item,
+    quantity: itemQuantity,
+    unit: itemUnit,
+    category: selectedCategory,
+    user: selectedUser,
+    dateAdded: Timestamp.now()
+  });
+
+  console.log("Item saved to Firestore:", item);
+}}
+
                                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                                        name === item
                                            ? 'bg-blue-600 text-white'
