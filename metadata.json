@@ -1,0 +1,5 @@
+{
+  "name": "Faisal & Gudiya Grocery Planner",
+  "description": "A beautiful and interactive grocery shopping and task planning application for mobile browsers. It helps track items, quantities, and purchases for two users, saving data locally for a month.",
+  "requestFramePermissions": []
+}
