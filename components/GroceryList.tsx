@@ -1,5 +1,3 @@
-import { fetchItems } from "../firebase";
-import { useEffect, useState } from "react";
 import React, { useState, useEffect, useMemo } from 'react';
 import { CheckIcon } from './icons/CheckIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
