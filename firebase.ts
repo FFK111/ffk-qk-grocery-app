@@ -10,10 +10,8 @@ import {
   query,
   where,
   Firestore,
-  // FIX: Add deleteDoc import for deleteUserFromList
   deleteDoc,
 } from "firebase/firestore";
-// FIX: Import UserProfile type for new user management functions
 import type { GroceryItem, UserProfile } from "./types";
 
 const firebaseConfig = {
@@ -113,7 +111,6 @@ export const deletePurchasedItems = async (listId: string): Promise<void> => {
 
 // --- User Management ---
 
-// FIX: Add missing getUsersForList function for UserLogin component
 export const getUsersForList = async (listId: string): Promise<UserProfile[]> => {
     const db = initializeDb();
     const usersCollectionRef = collection(db, "lists", listId, "users");
@@ -124,7 +121,6 @@ export const getUsersForList = async (listId: string): Promise<UserProfile[]> =>
         .map(data => data as UserProfile);
 };
 
-// FIX: Add missing createUserInList function for UserLogin component
 export const createUserInList = async (listId: string, username: string, pinHash: string): Promise<void> => {
     const db = initializeDb();
     const usersCollectionRef = collection(db, "lists", listId, "users");
@@ -142,7 +138,6 @@ export const createUserInList = async (listId: string, username: string, pinHash
     await setDoc(userDocRef, newUser);
 };
 
-// FIX: Add missing deleteUserFromList function for UserLogin component
 export const deleteUserFromList = async (listId: string, username: string): Promise<void> => {
     const db = initializeDb();
     const userDocRef = doc(db, "lists", listId, "users", username);

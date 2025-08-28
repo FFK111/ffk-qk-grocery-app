@@ -8,7 +8,6 @@ export interface GroceryItem {
   dateAdded: string; // ISO string
 }
 
-// FIX: Add missing UserProfile interface used in UserLogin.tsx
 export interface UserProfile {
   name: string;
   pinHash: string;
