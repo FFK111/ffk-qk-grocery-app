@@ -75,9 +75,14 @@ export const GroceryList: React.FC<GroceryListProps> = ({ categorizedItems, onTo
 
     if (categorizedItems.length === 0) {
         return (
-            <div className="text-center py-12 px-6 bg-slate-50/50 rounded-lg">
-                <p className="text-lg font-semibold text-slate-700">Your list is empty.</p>
-                <p className="text-slate-500 text-base mt-2">Tap the '+' button to get started!</p>
+            <div className="text-center py-16 px-6 bg-slate-50/50 rounded-lg flex flex-col items-center justify-center">
+                <svg className="w-24 h-24 text-slate-400 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <h3 className="text-xl font-bold text-slate-700">Your list is ready for action!</h3>
+                <p className="text-slate-500 text-base mt-2 max-w-xs mx-auto">
+                    Tap the big blue '+' button at the bottom right to start adding groceries and tasks.
+                </p>
             </div>
         );
     }

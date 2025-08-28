@@ -180,7 +180,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                     <form onSubmit={handleCreateUserSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="username" className="block text-sm font-medium text-slate-700">User Name</label>
-                            <input type="text" id="username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="mt-1 block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="e.g., Gudiya" required />
+                            <input type="text" id="username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="mt-1 block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="e.g., Faisal" required />
                         </div>
                          <div>
                             <label htmlFor="pin-create" className="block text-sm font-medium text-slate-700">4-Digit PIN</label>
@@ -204,7 +204,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                  <h1 className="text-4xl md:text-5xl font-bold tracking-wider text-white font-amiri" dir="rtl">
                     قائمة مشترياتنا وخططنا
                 </h1>
-                <p className="text-slate-200 mt-2 font-semibold">Welcome to list: <strong className="font-mono text-white bg-black/20 px-1.5 py-0.5 rounded">{listId}</strong></p>
+                <p className="text-slate-200 mt-2 font-semibold">Please select or create a user to continue.</p>
             </div>
             <div className="w-full max-w-sm bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-8 relative">
                 {renderContent()}
