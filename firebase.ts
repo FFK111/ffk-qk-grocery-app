@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, FirebaseApp } from "firebase/app";
 import { 
   getFirestore, 
   collection, 
@@ -6,99 +6,145 @@ import {
   doc, 
   setDoc, 
   writeBatch,
-  getDoc
+  onSnapshot,
+  query,
+  where,
+  Firestore,
+  // FIX: Add deleteDoc import for deleteUserFromList
+  deleteDoc,
 } from "firebase/firestore";
-import type { GroceryItem } from "./types";
+// FIX: Import UserProfile type for new user management functions
+import type { GroceryItem, UserProfile } from "./types";
 
-// Firebase config for your project
 const firebaseConfig = {
   apiKey: "AIzaSyD5XMfEYTKOEUMomtD4Wdqf88OjrCJtsBE",
   authDomain: "ffk-grocery-sync.firebaseapp.com",
   projectId: "ffk-grocery-sync",
-  storageBucket: "ffk-grocery-sync.appspot.com",
+  storageBucket: "ffk-grocery-sync.firebasestorage.app",
   messagingSenderId: "442396361973",
   appId: "1:442396361973:web:69ec493017e0373e5ff1bc"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// --- Lazy Initializaion ---
+// This prevents the app from crashing on startup if the config is invalid.
+let app: FirebaseApp;
+let db: Firestore;
 
-// Fetch grocery items from a specific list in Firestore
-export const fetchItems = async (listId: string): Promise<GroceryItem[]> => {
-  try {
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
-    const querySnapshot = await getDocs(itemsCollectionRef);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as GroceryItem[];
-  } catch (error) {
-    console.error("Error fetching items from Firestore:", error);
-    return [];
-  }
-};
-
-// Add a new grocery item to a specific list in Firestore
-export const addItemToFirestore = async (item: GroceryItem, listId: string): Promise<void> => {
-  try {
-    const itemDocRef = doc(db, "lists", listId, "items", item.id);
-    await setDoc(itemDocRef, item);
-  } catch (error) {
-    console.error("Error adding item to Firestore:", error);
-    throw error;
-  }
-};
-
-// Delete all items from a specific list in Firestore
-export const deleteAllItemsFromFirestore = async (listId: string): Promise<void> => {
-  try {
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
-    const querySnapshot = await getDocs(itemsCollectionRef);
-    if (querySnapshot.empty) {
-        return; // Nothing to delete
+const initializeDb = () => {
+    if (!app) {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
     }
+    return db;
+}
+
+// --- Real-time Item Management ---
+
+export const subscribeToItems = (
+    listId: string, 
+    onUpdate: (items: GroceryItem[]) => void, 
+    onError: (error: Error) => void
+) => {
+  const db = initializeDb();
+  const itemsCollectionRef = collection(db, "lists", listId, "items");
+  const unsubscribe = onSnapshot(itemsCollectionRef, (querySnapshot) => {
+    const items = querySnapshot.docs
+        .map(doc => doc.data())
+        .filter(data => data && typeof data.id === 'string' && typeof data.name === 'string') // Data validation
+        .map(data => data as GroceryItem);
+    onUpdate(items);
+  }, (error) => {
+    console.error("Error subscribing to items:", error);
+    onError(error);
+  });
+  return unsubscribe;
+};
+
+export const addItemToFirestore = async (item: GroceryItem, listId: string): Promise<void> => {
+  const db = initializeDb();
+  const itemDocRef = doc(db, "lists", listId, "items", item.id);
+  await setDoc(itemDocRef, item);
+};
+
+export const togglePurchasedByName = async (listId: string, itemName: string, newStatus: boolean): Promise<void> => {
+    const db = initializeDb();
+    const itemsCollectionRef = collection(db, "lists", listId, "items");
+    const q = query(itemsCollectionRef, where("name", "==", itemName));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) return;
+    
+    const batch = writeBatch(db);
+    querySnapshot.forEach(document => {
+        batch.update(document.ref, { purchased: newStatus });
+    });
+    await batch.commit();
+};
+
+export const deleteItemsByName = async (listId: string, itemName: string): Promise<void> => {
+    const db = initializeDb();
+    const itemsCollectionRef = collection(db, "lists", listId, "items");
+    const q = query(itemsCollectionRef, where("name", "==", itemName));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) return;
+
     const batch = writeBatch(db);
     querySnapshot.forEach(document => {
         batch.delete(document.ref);
     });
     await batch.commit();
-  } catch (error) {
-    console.error("Error deleting all items:", error);
-    throw error;
-  }
-};
-
-// --- User Management Functions ---
-
-export interface UserProfile {
-    name: string;
-    pinHash: string;
 }
 
-// Fetch all users for a specific list
-export const getUsersForList = async (listId: string): Promise<UserProfile[]> => {
-    try {
-        const usersCollectionRef = collection(db, "lists", listId, "users");
-        const querySnapshot = await getDocs(usersCollectionRef);
-        return querySnapshot.docs.map(doc => doc.data() as UserProfile);
-    } catch (error) {
-        console.error("Error fetching users:", error);
-        return [];
-    }
+export const deletePurchasedItems = async (listId: string): Promise<void> => {
+    const db = initializeDb();
+    const itemsCollectionRef = collection(db, "lists", listId, "items");
+    const q = query(itemsCollectionRef, where("purchased", "==", true));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) return;
+
+    const batch = writeBatch(db);
+    querySnapshot.forEach(document => {
+        batch.delete(document.ref);
+    });
+    await batch.commit();
 };
 
-// Create a new user in a specific list
+// --- User Management ---
+
+// FIX: Add missing getUsersForList function for UserLogin component
+export const getUsersForList = async (listId: string): Promise<UserProfile[]> => {
+    const db = initializeDb();
+    const usersCollectionRef = collection(db, "lists", listId, "users");
+    const querySnapshot = await getDocs(usersCollectionRef);
+    return querySnapshot.docs
+        .map(doc => doc.data())
+        .filter(data => data && typeof data.name === 'string' && typeof data.pinHash === 'string') // Data validation
+        .map(data => data as UserProfile);
+};
+
+// FIX: Add missing createUserInList function for UserLogin component
 export const createUserInList = async (listId: string, username: string, pinHash: string): Promise<void> => {
-    try {
-        const userDocRef = doc(db, "lists", listId, "users", username.toLowerCase());
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-            throw new Error("Username already exists in this list.");
-        }
-        await setDoc(userDocRef, { name: username, pinHash });
-    } catch (error) {
-        console.error("Error creating user:", error);
-        throw error;
-    }
+    const db = initializeDb();
+    const usersCollectionRef = collection(db, "lists", listId, "users");
+
+    // The first user added to a list will automatically become an admin.
+    const querySnapshot = await getDocs(usersCollectionRef);
+    const isAdmin = querySnapshot.empty;
+
+    const userDocRef = doc(db, "lists", listId, "users", username);
+    const newUser: UserProfile = {
+        name: username,
+        pinHash,
+        isAdmin,
+    };
+    await setDoc(userDocRef, newUser);
+};
+
+// FIX: Add missing deleteUserFromList function for UserLogin component
+export const deleteUserFromList = async (listId: string, username: string): Promise<void> => {
+    const db = initializeDb();
+    const userDocRef = doc(db, "lists", listId, "users", username);
+    await deleteDoc(userDocRef);
 };

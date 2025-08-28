@@ -3,17 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Our Grocery and Plan List</title>
+    <title>Grocery Hub and Notes</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
         font-family: 'Poppins', sans-serif;
-      }
-      .font-amiri {
-        font-family: 'Amiri', serif;
       }
       body::before {
         content: '';
@@ -26,9 +23,10 @@
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        filter: blur(5px);
-        -webkit-filter: blur(5px);
+        background-color: rgba(0,0,0,0.4);
+        filter: blur(8px);
         z-index: -1;
+        transform: scale(1.1);
       }
     </style>
   <script type="importmap">
@@ -44,6 +42,6 @@
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.tsx?v=2.0.1"></script>
   </body>
 </html>

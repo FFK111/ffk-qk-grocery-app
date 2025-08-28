@@ -1,7 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { getUsersForList, createUserInList, UserProfile } from '../firebase';
+import { getUsersForList, createUserInList, deleteUserFromList } from '../firebase';
+import type { UserProfile } from '../types';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface UserLoginProps {
     listId: string;
@@ -9,13 +12,11 @@ interface UserLoginProps {
     onSwitchList: () => void;
 }
 
-type Mode = 'selectUser' | 'enterPin' | 'createUser';
+type Mode = 'selectUser' | 'enterPin' | 'createUser' | 'error';
 
-// Simple but effective client-side hashing
 async function hashPin(pin: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(pin);
-    // FIX: Changed from invalid 'SHA-266' to the correct 'SHA-256' standard
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -25,6 +26,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
     const [mode, setMode] = useState<Mode>('selectUser');
     const [existingUsers, setExistingUsers] = useState<UserProfile[]>([]);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const [adminSessionUser, setAdminSessionUser] = useState<UserProfile | null>(null);
     
     const [newUsername, setNewUsername] = useState('');
     const [pin, setPin] = useState('');
@@ -32,18 +34,39 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
+    const fetchUsers = () => {
         setIsLoading(true);
+        setError(null);
         getUsersForList(listId)
             .then(users => {
                 setExistingUsers(users);
                 if (users.length === 0) {
-                    setMode('createUser'); // If no users, go straight to creation
+                    setMode('createUser');
+                } else {
+                    setMode('selectUser');
                 }
             })
-            .catch(err => setError("Could not load user profiles."))
+            .catch(err => setError("Could not load user profiles. Check your Firebase rules."))
             .finally(() => setIsLoading(false));
+    };
+
+    useEffect(() => {
+        if (!window.crypto || !window.crypto.subtle) {
+            setError("This browser is not secure. PIN hashing is not available. Please use a modern browser on an HTTPS connection.");
+            setIsLoading(false);
+            setMode('error');
+        } else {
+            fetchUsers();
+        }
     }, [listId]);
+
+    const resetToSelection = () => {
+        setMode('selectUser');
+        setSelectedUser(null);
+        setError(null);
+        setPin('');
+        setNewUsername('');
+    }
 
     const handlePinSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -59,11 +82,19 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
             if (selectedUser.pinHash !== hashedPin) {
                 throw new Error('Incorrect PIN. Please try again.');
             }
-            onLoginSuccess(selectedUser.name);
+            
+            if (selectedUser.isAdmin) {
+                setAdminSessionUser(selectedUser);
+                resetToSelection();
+                fetchUsers(); // Re-fetch to show latest user list in admin mode
+            } else {
+                onLoginSuccess(selectedUser.name);
+            }
         } catch (err: any) {
             setError(err.message);
-            setIsLoading(false);
             setPin('');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -86,16 +117,25 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
             onLoginSuccess(newUsername.trim());
         } catch (err: any) {
             setError(err.message);
+        } finally {
             setIsLoading(false);
         }
     };
     
-    const resetToSelection = () => {
-        setMode('selectUser');
-        setSelectedUser(null);
-        setError(null);
-        setPin('');
-        setNewUsername('');
+    const handleDeleteUser = async (username: string) => {
+        if(window.confirm(`Are you sure you want to delete the user "${username}"? This action cannot be undone.`)) {
+            try {
+                await deleteUserFromList(listId, username);
+                fetchUsers(); // Re-fetch users to update the list
+            } catch (error) {
+                console.error("Failed to delete user:", error);
+                alert("Could not delete user.");
+            }
+        }
+    };
+
+    const handleExitAdminMode = () => {
+        setAdminSessionUser(null);
     }
 
     const renderContent = () => {
@@ -103,22 +143,47 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
             return <div className="text-center text-slate-600 font-semibold">Loading users...</div>;
         }
 
+        if (mode === 'error') {
+            return <p className="text-sm text-red-600 bg-red-100 p-3 rounded-md text-center">{error}</p>;
+        }
+
         if (mode === 'selectUser') {
             return (
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-6">Who are you?</h2>
-                    <div className="space-y-3">
+                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-6">
+                        {adminSessionUser ? `Admin Mode` : 'Who are you?'}
+                    </h2>
+                     {adminSessionUser && (
+                        <p className="text-center text-sm text-slate-600 -mt-4 mb-4">
+                            Logged in as <strong className="font-semibold">{adminSessionUser.name}</strong>. Select a user to delete or tap your name to log in.
+                        </p>
+                    )}
+                    <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
                         {existingUsers.map(user => (
-                            <button 
-                                key={user.name}
-                                onClick={() => {
-                                    setSelectedUser(user);
-                                    setMode('enterPin');
-                                }}
-                                className="w-full text-left bg-white font-bold p-4 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors shadow"
-                            >
-                                {user.name}
-                            </button>
+                            <div key={user.name} className="flex items-center gap-2 group">
+                                <button 
+                                    onClick={() => {
+                                        if (adminSessionUser && adminSessionUser.name === user.name) {
+                                            onLoginSuccess(user.name);
+                                        } else {
+                                            setSelectedUser(user);
+                                            setMode('enterPin');
+                                        }
+                                    }}
+                                    className="w-full text-left bg-white font-bold p-4 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors shadow flex-1"
+                                >
+                                    {user.name} {user.isAdmin && <span className="text-xs font-normal text-blue-600">(Admin)</span>}
+                                </button>
+                                {adminSessionUser && adminSessionUser.name !== user.name && (
+                                    <button 
+                                        onClick={() => handleDeleteUser(user.name)}
+                                        className="w-10 h-10 flex items-center justify-center text-slate-400 hover:bg-red-100 hover:text-red-600 rounded-full transition-opacity"
+                                        aria-label={`Delete user ${user.name}`}
+                                    >
+                                        <TrashIcon className="w-5 h-5" />
+                                    </button>
+                                )}
+                            </div>
                         ))}
                     </div>
                     <div className="relative my-6">
@@ -128,6 +193,11 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                      <button onClick={() => setMode('createUser')} className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors shadow-md">
                         Add New User
                     </button>
+                    {adminSessionUser && (
+                         <button onClick={handleExitAdminMode} className="w-full text-sm text-center text-slate-600 hover:text-red-600 hover:underline mt-4">
+                            Exit Admin Mode
+                        </button>
+                    )}
                 </div>
             );
         }
@@ -139,7 +209,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                         <ArrowLeftIcon className="w-6 h-6" />
                     </button>
                     <h2 className="text-2xl font-bold text-slate-800 text-center">Welcome, {selectedUser?.name}!</h2>
-                    <p className="text-center text-slate-600 mb-6">Enter your PIN to continue</p>
+                    <p className="text-center text-slate-600 mb-6">Enter your 4-digit PIN to continue</p>
                     <form onSubmit={handlePinSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="pin" className="sr-only">4-Digit PIN</label>
@@ -148,6 +218,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                                 id="pin"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
+                                minLength={4}
                                 maxLength={4}
                                 value={pin}
                                 onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
@@ -176,15 +247,15 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                             <ArrowLeftIcon className="w-6 h-6" />
                         </button>
                     )}
-                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-6">Create New User</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-6">{existingUsers.length > 0 ? 'Create New User' : 'Create First User (Admin)'}</h2>
                     <form onSubmit={handleCreateUserSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="username" className="block text-sm font-medium text-slate-700">User Name</label>
+                            <label htmlFor="username" className="block text-sm font-medium text-slate-700">Your Name</label>
                             <input type="text" id="username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="mt-1 block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="e.g., Faisal" required />
                         </div>
                          <div>
-                            <label htmlFor="pin-create" className="block text-sm font-medium text-slate-700">4-Digit PIN</label>
-                            <input type="password" id="pin-create" inputMode="numeric" pattern="[0-9]*" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))} className="mt-1 block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="e.g., 1234" required />
+                            <label htmlFor="pin-create" className="block text-sm font-medium text-slate-700">Create a 4-Digit PIN</label>
+                            <input type="password" id="pin-create" inputMode="numeric" pattern="[0-9]*" minLength={4} maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))} className="mt-1 block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="e.g., 1234" required />
                         </div>
                         {error && <p className="text-sm text-red-600 bg-red-100 p-2 rounded-md">{error}</p>}
                         <div className="pt-2">
@@ -201,8 +272,8 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
     return (
         <div className="min-h-screen bg-black/10 flex flex-col items-center justify-center p-4">
              <div className="text-center mb-8" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                 <h1 className="text-4xl md:text-5xl font-bold tracking-wider text-white font-amiri" dir="rtl">
-                    قائمة مشترياتنا وخططنا
+                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+                    Grocery Hub & Notes
                 </h1>
                 <p className="text-slate-200 mt-2 font-semibold">Please select or create a user to continue.</p>
             </div>

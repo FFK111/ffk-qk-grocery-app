@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { CheckIcon } from './icons/CheckIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface AggregatedItem {
     name: string;
@@ -14,18 +14,19 @@ interface AggregatedItem {
 interface GroceryListProps {
     categorizedItems: [string, AggregatedItem[]][];
     onToggleItem: (itemName: string) => void;
+    onDeleteItem: (itemName: string) => void;
 }
 
-const GroceryListItem: React.FC<{ item: AggregatedItem; onToggleItem: (itemName: string) => void }> = ({ item, onToggleItem }) => {
+const GroceryListItem: React.FC<{ item: AggregatedItem; onToggleItem: (itemName: string) => void; onDeleteItem: (itemName: string) => void; }> = ({ item, onToggleItem, onDeleteItem }) => {
     const isTask = item.category === 'Other Tasks';
     
     return (
         <li
-            className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ease-in-out ${
+            className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ease-in-out group ${
                 item.purchased ? 'bg-green-100/70 text-gray-500' : 'bg-white'
             }`}
         >
-            <div className="flex items-center min-w-0">
+            <div className="flex items-center min-w-0 flex-1">
                 <button
                     onClick={() => onToggleItem(item.name)}
                     className={`w-6 h-6 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 mr-4 ${
@@ -37,20 +38,31 @@ const GroceryListItem: React.FC<{ item: AggregatedItem; onToggleItem: (itemName:
                 >
                     {item.purchased && <CheckIcon className="w-4 h-4 text-white" />}
                 </button>
-                <span className={`font-medium truncate ${item.purchased ? 'line-through' : ''}`}>
-                    {item.name}
-                </span>
+                <div className="min-w-0">
+                    <p className={`font-medium truncate ${item.purchased ? 'line-through' : ''}`}>
+                        {item.name}
+                    </p>
+                </div>
             </div>
-            {!isTask && (
-                 <span className="text-sm flex-shrink-0 font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full ml-2">
-                    {item.totalQuantity} {item.unit}
-                </span>
-            )}
+            <div className="flex items-center flex-shrink-0 ml-2">
+                {!isTask && (
+                     <span className="text-sm font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full">
+                        {item.totalQuantity} {item.unit}
+                    </span>
+                )}
+                 <button 
+                    onClick={() => onDeleteItem(item.name)}
+                    className="ml-2 w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-red-100 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Delete ${item.name}`}
+                 >
+                    <TrashIcon className="w-5 h-5"/>
+                </button>
+            </div>
         </li>
     );
 };
 
-export const GroceryList: React.FC<GroceryListProps> = ({ categorizedItems, onToggleItem }) => {
+export const GroceryList: React.FC<GroceryListProps> = ({ categorizedItems, onToggleItem, onDeleteItem }) => {
     const categoryNames = useMemo(() => categorizedItems.map(([name]) => name), [categorizedItems]);
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() =>
         categoryNames.reduce((acc, name) => ({ ...acc, [name]: true }), {})
@@ -103,7 +115,7 @@ export const GroceryList: React.FC<GroceryListProps> = ({ categorizedItems, onTo
                     {openCategories[category] && (
                         <ul className="space-y-2 p-3" id={`category-panel-${category}`}>
                             {items.map(item => (
-                                <GroceryListItem key={item.name} item={item} onToggleItem={onToggleItem} />
+                                <GroceryListItem key={item.name} item={item} onToggleItem={onToggleItem} onDeleteItem={onDeleteItem} />
                             ))}
                         </ul>
                     )}

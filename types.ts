@@ -6,12 +6,15 @@ export interface GroceryItem {
   category: string;
   purchased: boolean;
   dateAdded: string; // ISO string
-  addedBy?: string;
+}
+
+// FIX: Add missing UserProfile interface used in UserLogin.tsx
+export interface UserProfile {
+  name: string;
+  pinHash: string;
+  isAdmin: boolean;
 }
 
 export type PredefinedGroceries = {
     [category: string]: string[];
 }
-
-// FIX: Exported User type to resolve missing export error in components/UserSelector.tsx
-export type User = string;

@@ -1,5 +1,5 @@
 {
-  "name": "Our Grocery and Plan List",
-  "description": "A beautiful and interactive grocery shopping and task planning application. It helps track items, quantities, and purchases, syncing data in real-time for collaborative list management.",
+  "name": "Grocery Hub and Notes",
+  "description": "A beautiful and interactive grocery shopping and notes application. It helps track items and tasks, syncing data in real-time for collaborative list management.",
   "requestFramePermissions": []
 }
