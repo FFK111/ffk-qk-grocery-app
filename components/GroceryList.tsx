@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { CheckIcon } from './icons/CheckIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
@@ -74,9 +75,9 @@ export const GroceryList: React.FC<GroceryListProps> = ({ categorizedItems, onTo
 
     if (categorizedItems.length === 0) {
         return (
-            <div className="text-center py-10">
-                <p className="text-slate-500">Your grocery list is empty.</p>
-                <p className="text-slate-400 text-sm mt-2">Click the '+' button to add items!</p>
+            <div className="text-center py-12 px-6 bg-slate-50/50 rounded-lg">
+                <p className="text-lg font-semibold text-slate-700">Your list is empty.</p>
+                <p className="text-slate-500 text-base mt-2">Tap the '+' button to get started!</p>
             </div>
         );
     }

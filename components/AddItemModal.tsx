@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { GroceryItem, PredefinedGroceries } from '../types';
 import { XIcon } from './icons/XIcon';
@@ -15,25 +16,40 @@ const COMMON_UNITS = ["pcs", "kg", "g", "L", "ml", "pack", "dozen", "bottle", "c
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAddItem, category, predefinedGroceries, onGoBack }) => {
     const [name, setName] = useState('');
-    const [quantity, setQuantity] = useState(1);
+    const [quantity, setQuantity] = useState('1');
     const [unit, setUnit] = useState(COMMON_UNITS[0]);
     const [customUnit, setCustomUnit] = useState('');
 
     const isTask = useMemo(() => category === 'Other Tasks', [category]);
     const itemsForCategory = useMemo(() => predefinedGroceries[category] || [], [predefinedGroceries, category]);
 
+    const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        // Allow empty string, or valid positive numbers (integer or decimal)
+        if (value === '' || /^[0-9]*\.?[0-9]*$/.test(value)) {
+            setQuantity(value);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const numericQuantity = parseFloat(quantity);
+
         if (name.trim()) {
+            if (!isTask && (isNaN(numericQuantity) || numericQuantity <= 0)) {
+                alert("Please enter a valid quantity greater than 0.");
+                return;
+            }
+
             const finalUnit = isTask ? '' : (unit === 'Other...' ? customUnit.trim() : unit);
             if (!isTask && unit === 'Other...' && !finalUnit) {
-                // Optional: add validation for empty custom unit
+                alert("Please specify your custom unit.");
                 return;
             }
 
             onAddItem({ 
                 name: name.trim(), 
-                quantity: isTask ? 1 : quantity, 
+                quantity: isTask ? 1 : numericQuantity, 
                 unit: finalUnit, 
                 category: category 
             });
@@ -103,12 +119,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAddItem, 
                             <div>
                                <label htmlFor="quantity" className="block text-sm font-medium text-slate-700">Quantity</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     id="quantity"
                                     value={quantity}
-                                    onChange={(e) => setQuantity(Math.max(0.1, Number(e.target.value)))}
-                                    min="0.1"
-                                    step="0.1"
+                                    onChange={handleQuantityChange}
                                     className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     required
                                 />

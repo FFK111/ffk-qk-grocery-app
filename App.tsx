@@ -16,34 +16,14 @@ type ModalState = {
   category?: string;
 };
 
-// Utility to add a timeout to any promise
-const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMessage = 'Operation timed out.'): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(errorMessage));
-    }, ms);
-
-    promise
-      .then(value => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch(reason => {
-        clearTimeout(timer);
-        reject(reason);
-      });
-  });
-};
-
-
 export default function App(): React.ReactNode {
   const [items, setItems] = useState<GroceryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
 
   useEffect(() => {
-    setLoading(true);
+    setIsInitialSyncing(true);
     // Fetch items from Firestore once on initial load
     fetchItems()
       .then((cloudItems) => {
@@ -51,9 +31,10 @@ export default function App(): React.ReactNode {
       })
       .catch((error) => {
         console.error("Failed to fetch items:", error);
+        alert(`Could not load your list from the cloud. Please check your internet connection.\nError: ${error.message}`);
       })
       .finally(() => {
-        setLoading(false);
+        setIsInitialSyncing(false);
       });
   }, []);
 
@@ -91,14 +72,10 @@ export default function App(): React.ReactNode {
   const handleSaveList = async () => {
     setIsSyncing(true);
     try {
-      const saveOperation = async () => {
-        // Clear the remote list and upload the current local list
-        await deleteAllItemsFromFirestore();
-        const addPromises = items.map(item => addItemToFirestore(item));
-        await Promise.all(addPromises);
-      };
-      
-      await withTimeout(saveOperation(), 10000, 'Saving to the database timed out.');
+      // Clear the remote list and upload the current local list
+      await deleteAllItemsFromFirestore();
+      const addPromises = items.map(item => addItemToFirestore(item));
+      await Promise.all(addPromises);
       
       alert('List saved successfully!');
     } catch (error: any) {
@@ -117,7 +94,7 @@ export default function App(): React.ReactNode {
     if (window.confirm('Are you sure you want to delete the entire list? This action cannot be undone.')) {
       setIsSyncing(true);
       try {
-        await withTimeout(deleteAllItemsFromFirestore(), 10000, 'Deleting from the database timed out.');
+        await deleteAllItemsFromFirestore();
         setItems([]); // Clear local state
         alert('List deleted successfully!');
       } catch (error: any) {
@@ -182,8 +159,8 @@ export default function App(): React.ReactNode {
 
   return (
     <div className="min-h-screen bg-black/10 flex flex-col">
-      <Header />
-       {loading ? (
+      <Header isSyncing={isInitialSyncing} />
+       {isInitialSyncing && items.length === 0 ? (
             <main className="flex-grow container mx-auto p-4 max-w-2xl flex items-center justify-center">
                 <div className="text-center bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-10">
                     <p className="text-slate-600 text-lg font-semibold">Loading your list...</p>
