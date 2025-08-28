@@ -6,10 +6,13 @@ import { GroceryList } from './components/GroceryList';
 import { AddItemModal } from './components/AddItemModal';
 import { CategorySelectorModal } from './components/CategorySelectorModal';
 import { ProgressBar } from './components/ProgressBar';
+import { ListManager } from './components/ListManager';
+import { UserLogin } from './components/UserLogin';
 import { PlusIcon } from './components/icons/PlusIcon';
 import type { GroceryItem } from './types';
 import { PREDEFINED_GROCERIES } from './constants';
 import { fetchItems, deleteAllItemsFromFirestore, addItemToFirestore } from './firebase';
+import { useLocalStorage } from './hooks/useLocalStorage';
 
 type ModalState = {
   step: 'closed' | 'selectCategory' | 'addItem';
@@ -21,11 +24,19 @@ export default function App(): React.ReactNode {
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
+  
+  const [currentListId, setCurrentListId] = useLocalStorage<string | null>('grocery-list-id', null);
+  const [currentUser, setCurrentUser] = useLocalStorage<string | null>('grocery-list-user', null);
 
   useEffect(() => {
+    if (!currentListId || !currentUser) {
+      setIsInitialSyncing(false);
+      if(!currentListId) setItems([]); // Clear items if user logs out of list
+      return;
+    };
+
     setIsInitialSyncing(true);
-    // Fetch items from Firestore once on initial load
-    fetchItems()
+    fetchItems(currentListId)
       .then((cloudItems) => {
         setItems(cloudItems);
       })
@@ -36,7 +47,25 @@ export default function App(): React.ReactNode {
       .finally(() => {
         setIsInitialSyncing(false);
       });
-  }, []);
+  }, [currentListId, currentUser]);
+
+  const handleListSelected = (listId: string) => {
+    setCurrentListId(listId.trim());
+    setCurrentUser(null); // Force user login for the new list
+  };
+
+  const handleSwitchList = () => {
+    if (window.confirm('Are you sure you want to switch to a different list? This will log you out.')) {
+        setCurrentListId(null);
+        setCurrentUser(null);
+    }
+  };
+  
+  const handleSwitchUser = () => {
+    if (window.confirm('Are you sure you want to switch users?')) {
+        setCurrentUser(null);
+    }
+  };
 
   const addItem = (
     newItem: Omit<GroceryItem, 'id' | 'dateAdded' | 'purchased'>
@@ -46,8 +75,8 @@ export default function App(): React.ReactNode {
       id: `${new Date().getTime()}-${Math.random()}`,
       dateAdded: new Date().toISOString(),
       purchased: false,
+      addedBy: currentUser || 'Unknown',
     };
-    // Update local state only
     setItems(prevItems => [...prevItems, newItemWithId]);
     setModalState({ step: 'closed' });
   };
@@ -59,7 +88,6 @@ export default function App(): React.ReactNode {
     const areAllCurrentlyPurchased = itemsToUpdate.every(i => i.purchased);
     const newPurchasedStatus = !areAllCurrentlyPurchased;
 
-    // Update local state only
     setItems(currentItems =>
       currentItems.map(item =>
         item.name === itemName
@@ -70,19 +98,18 @@ export default function App(): React.ReactNode {
   };
 
   const handleSaveList = async () => {
+    if (!currentListId) return;
     setIsSyncing(true);
     try {
-      // Clear the remote list and upload the current local list
-      await deleteAllItemsFromFirestore();
-      const addPromises = items.map(item => addItemToFirestore(item));
+      await deleteAllItemsFromFirestore(currentListId);
+      const addPromises = items.map(item => addItemToFirestore(item, currentListId));
       await Promise.all(addPromises);
-      
       alert('List saved successfully!');
     } catch (error: any) {
       console.error("Failed to save list:", error);
       let alertMessage = `Failed to save the list. Please check your connection and Firebase setup.\nError: ${error.message}`;
       if (error?.code === 'permission-denied') {
-        alertMessage = 'Error: Permission Denied.\n\nPlease check your Firestore security rules in the Firebase console. They need to allow write operations to the "items" collection for the app to work correctly.';
+        alertMessage = 'Error: Permission Denied.\n\nPlease check your Firestore security rules.';
       }
       alert(alertMessage);
     } finally {
@@ -91,17 +118,18 @@ export default function App(): React.ReactNode {
   };
 
   const handleDeleteList = async () => {
+    if (!currentListId) return;
     if (window.confirm('Are you sure you want to delete the entire list? This action cannot be undone.')) {
       setIsSyncing(true);
       try {
-        await deleteAllItemsFromFirestore();
-        setItems([]); // Clear local state
+        await deleteAllItemsFromFirestore(currentListId);
+        setItems([]);
         alert('List deleted successfully!');
       } catch (error: any) {
         console.error("Failed to delete list:", error);
         let alertMessage = `Failed to delete the list. Please check your connection and Firebase setup.\nError: ${error.message}`;
         if (error?.code === 'permission-denied') {
-            alertMessage = 'Error: Permission Denied.\n\nPlease check your Firestore security rules in the Firebase console. They need to allow write operations to the "items" collection for the app to work correctly.';
+            alertMessage = 'Error: Permission Denied.\n\nPlease check your Firestore security rules.';
         }
         alert(alertMessage);
       } finally {
@@ -157,9 +185,23 @@ export default function App(): React.ReactNode {
     return (purchased / total) * 100;
   }, [aggregatedItems]);
 
+  if (!currentListId) {
+    return <ListManager onListSelected={handleListSelected} />;
+  }
+
+  if (!currentUser) {
+    return <UserLogin listId={currentListId} onLoginSuccess={setCurrentUser} onSwitchList={handleSwitchList} />;
+  }
+
   return (
     <div className="min-h-screen bg-black/10 flex flex-col">
-      <Header isSyncing={isInitialSyncing} />
+      <Header 
+        isSyncing={isInitialSyncing} 
+        listId={currentListId}
+        currentUser={currentUser}
+        onSwitchList={handleSwitchList}
+        onSwitchUser={handleSwitchUser}
+      />
        {isInitialSyncing && items.length === 0 ? (
             <main className="flex-grow container mx-auto p-4 max-w-2xl flex items-center justify-center">
                 <div className="text-center bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-10">

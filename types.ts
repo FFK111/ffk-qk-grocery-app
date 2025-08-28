@@ -6,6 +6,7 @@ export interface GroceryItem {
   category: string;
   purchased: boolean;
   dateAdded: string; // ISO string
+  addedBy?: string;
 }
 
 export type PredefinedGroceries = {
