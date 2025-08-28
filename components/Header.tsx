@@ -10,6 +10,13 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ isSyncing, listId, currentUser, onSwitchList, onSwitchUser }) => {
+    
+    const handleShare = () => {
+        if (listId) {
+            alert(`Share this ID to invite others to your list:\n\n${listId}`);
+        }
+    };
+
     return (
         <header 
             className="bg-black/20 backdrop-blur-md text-slate-200 shadow-lg p-4 text-center sticky top-0 z-40" 
@@ -30,10 +37,10 @@ export const Header: React.FC<HeaderProps> = ({ isSyncing, listId, currentUser, 
                                 <p className="text-sm text-slate-200">
                                     Welcome, <strong className="font-semibold text-white">{currentUser}</strong>!
                                 </p>
-                                <div className="flex items-center gap-2">
-                                    <p className="text-xs text-slate-300">
-                                        List ID: <strong className="font-mono bg-slate-800/50 text-slate-100 py-0.5 px-1.5 rounded">{listId}</strong>
-                                    </p>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={handleShare} className="text-xs text-green-400 hover:text-green-200 hover:underline">
+                                        Share List
+                                    </button>
                                     <button onClick={onSwitchUser} className="text-xs text-sky-400 hover:text-sky-200 hover:underline">
                                         Switch User
                                     </button>
