@@ -101,9 +101,13 @@ export default function App(): React.ReactNode {
       await withTimeout(saveOperation(), 10000, 'Saving to the database timed out.');
       
       alert('List saved successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save list:", error);
-      alert(`Failed to save the list. Please check your connection and Firebase setup.\nError: ${error.message}`);
+      let alertMessage = `Failed to save the list. Please check your connection and Firebase setup.\nError: ${error.message}`;
+      if (error?.code === 'permission-denied') {
+        alertMessage = 'Error: Permission Denied.\n\nPlease check your Firestore security rules in the Firebase console. They need to allow write operations to the "items" collection for the app to work correctly.';
+      }
+      alert(alertMessage);
     } finally {
       setIsSyncing(false);
     }
@@ -116,9 +120,13 @@ export default function App(): React.ReactNode {
         await withTimeout(deleteAllItemsFromFirestore(), 10000, 'Deleting from the database timed out.');
         setItems([]); // Clear local state
         alert('List deleted successfully!');
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to delete list:", error);
-        alert(`Failed to delete the list. Please check your connection and Firebase setup.\nError: ${error.message}`);
+        let alertMessage = `Failed to delete the list. Please check your connection and Firebase setup.\nError: ${error.message}`;
+        if (error?.code === 'permission-denied') {
+            alertMessage = 'Error: Permission Denied.\n\nPlease check your Firestore security rules in the Firebase console. They need to allow write operations to the "items" collection for the app to work correctly.';
+        }
+        alert(alertMessage);
       } finally {
         setIsSyncing(false);
       }
