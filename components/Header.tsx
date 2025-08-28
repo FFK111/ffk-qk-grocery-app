@@ -11,11 +11,11 @@ export const Header: React.FC = () => {
     }, []);
 
     return (
-        <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md p-4 text-center">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-wider">
-                FAISAL & GUDIYA GROCERY
+        <header className="bg-white/30 backdrop-blur-md text-slate-800 shadow-md p-4 text-center sticky top-0 z-40">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-wider text-slate-900">
+                Our Grocery and Plan List
             </h1>
-            <p className="text-sm text-blue-200 mt-1">{currentDate}</p>
+            <p className="text-sm text-slate-600 mt-1">{currentDate}</p>
         </header>
     );
 };

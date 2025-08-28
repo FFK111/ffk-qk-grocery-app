@@ -5,16 +5,19 @@ import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
 
 interface AddItemModalProps {
     onClose: () => void;
-    onAddItem: (item: Omit<GroceryItem, 'id' | 'addedBy' | 'dateAdded' | 'purchased'>) => void;
+    onAddItem: (item: Omit<GroceryItem, 'id' | 'dateAdded' | 'purchased'>) => void;
     category: string;
     predefinedGroceries: PredefinedGroceries;
     onGoBack: () => void;
 }
 
+const COMMON_UNITS = ["pcs", "kg", "g", "L", "ml", "pack", "dozen", "bottle", "can", "Other..."];
+
 export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAddItem, category, predefinedGroceries, onGoBack }) => {
     const [name, setName] = useState('');
     const [quantity, setQuantity] = useState(1);
-    const [unit, setUnit] = useState('kg');
+    const [unit, setUnit] = useState(COMMON_UNITS[0]);
+    const [customUnit, setCustomUnit] = useState('');
 
     const isTask = useMemo(() => category === 'Other Tasks', [category]);
     const itemsForCategory = useMemo(() => predefinedGroceries[category] || [], [predefinedGroceries, category]);
@@ -22,12 +25,19 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAddItem, 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (name.trim()) {
+            const finalUnit = isTask ? '' : (unit === 'Other...' ? customUnit.trim() : unit);
+            if (!isTask && unit === 'Other...' && !finalUnit) {
+                // Optional: add validation for empty custom unit
+                return;
+            }
+
             onAddItem({ 
                 name: name.trim(), 
                 quantity: isTask ? 1 : quantity, 
-                unit: isTask ? '' : unit.trim(), 
+                unit: finalUnit, 
                 category: category 
             });
+            onClose(); // Close modal immediately for better UX
         }
     };
 
@@ -103,26 +113,26 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAddItem, 
                                     required
                                 />
                             </div>
-                            <div>
+                             <div className="relative">
                                 <label htmlFor="unit" className="block text-sm font-medium text-slate-700">Unit</label>
-                                <input
-                                    type="text"
+                                <select
                                     id="unit"
                                     value={unit}
                                     onChange={(e) => setUnit(e.target.value)}
-                                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                    list="common-units"
-                                    required
-                                />
-                                <datalist id="common-units">
-                                    <option value="kg" />
-                                    <option value="g" />
-                                    <option value="L" />
-                                    <option value="ml" />
-                                    <option value="pcs" />
-                                    <option value="dozen" />
-                                    <option value="pack" />
-                                </datalist>
+                                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none"
+                                >
+                                   {COMMON_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                                {unit === 'Other...' && (
+                                     <input
+                                        type="text"
+                                        value={customUnit}
+                                        onChange={e => setCustomUnit(e.target.value)}
+                                        placeholder="Your unit"
+                                        className="mt-2 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                        required
+                                    />
+                                )}
                             </div>
                         </div>
                     )}

@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Faisal & Gudiya Grocery</title>
+    <title>Our Grocery and Plan List</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +11,21 @@
     <style>
       body {
         font-family: 'Poppins', sans-serif;
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2070&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        filter: blur(5px);
+        -webkit-filter: blur(5px);
+        z-index: -1;
       }
     </style>
   <script type="importmap">
@@ -25,7 +39,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50">
+  <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

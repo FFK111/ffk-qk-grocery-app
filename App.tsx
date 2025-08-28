@@ -1,81 +1,128 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
-import { UserSelector } from './components/UserSelector';
 import { GroceryList } from './components/GroceryList';
 import { AddItemModal } from './components/AddItemModal';
 import { CategorySelectorModal } from './components/CategorySelectorModal';
 import { ProgressBar } from './components/ProgressBar';
 import { PlusIcon } from './components/icons/PlusIcon';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import type { User, GroceryItem } from './types';
+import type { GroceryItem } from './types';
 import { PREDEFINED_GROCERIES } from './constants';
-import { listenToItems, addItemToFirestore, updateItemPurchasedStatus } from './firebase';
-
-const USER_STORAGE_KEY = 'faisalGudiyaGroceryUser';
+import { fetchItems, deleteAllItemsFromFirestore, addItemToFirestore } from './firebase';
 
 type ModalState = {
   step: 'closed' | 'selectCategory' | 'addItem';
   category?: string;
 };
 
+// Utility to add a timeout to any promise
+const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMessage = 'Operation timed out.'): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, ms);
+
+    promise
+      .then(value => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(reason => {
+        clearTimeout(timer);
+        reject(reason);
+      });
+  });
+};
+
+
 export default function App(): React.ReactNode {
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useLocalStorage<User>(USER_STORAGE_KEY, 'Faisal');
+  const [isSyncing, setIsSyncing] = useState(false);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
 
   useEffect(() => {
     setLoading(true);
-    // Subscribe to real-time updates from Firestore
-    const unsubscribe = listenToItems((cloudItems) => {
-      setItems(cloudItems);
-      setLoading(false);
-    });
-
-    // Cleanup subscription on component unmount
-    return () => unsubscribe();
+    // Fetch items from Firestore once on initial load
+    fetchItems()
+      .then((cloudItems) => {
+        setItems(cloudItems);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch items:", error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
-  const addItem = async (
-    newItem: Omit<GroceryItem, 'id' | 'addedBy' | 'dateAdded' | 'purchased'>
+  const addItem = (
+    newItem: Omit<GroceryItem, 'id' | 'dateAdded' | 'purchased'>
   ) => {
     const newItemWithId: GroceryItem = {
       ...newItem,
       id: `${new Date().getTime()}-${Math.random()}`,
-      addedBy: currentUser,
       dateAdded: new Date().toISOString(),
       purchased: false,
     };
-    
-    // The real-time listener will update the state automatically.
-    // This avoids potential race conditions or double-renders.
-    try {
-      await addItemToFirestore(newItemWithId);
-      setModalState({ step: 'closed' });
-    } catch (error) {
-      console.error("Failed to add item:", error);
-      // You could add user-facing error handling here
-    }
+    // Update local state only
+    setItems(prevItems => [...prevItems, newItemWithId]);
+    setModalState({ step: 'closed' });
   };
 
   const toggleItemPurchased = (itemName: string) => {
     const itemsToUpdate = items.filter(i => i.name === itemName);
     if (itemsToUpdate.length === 0) return;
 
-    // Decide the new state based on the current state of all items with that name
     const areAllCurrentlyPurchased = itemsToUpdate.every(i => i.purchased);
     const newPurchasedStatus = !areAllCurrentlyPurchased;
 
-    // Fire off all the updates to Firestore; the listener will handle the UI change.
-    const updatePromises = itemsToUpdate.map(item => 
-        updateItemPurchasedStatus(item.id, newPurchasedStatus)
+    // Update local state only
+    setItems(currentItems =>
+      currentItems.map(item =>
+        item.name === itemName
+          ? { ...item, purchased: newPurchasedStatus }
+          : item
+      )
     );
+  };
 
-    Promise.all(updatePromises).catch(error => {
-        console.error("Failed to update item status:", error);
-         // You could add user-facing error handling here
-    });
+  const handleSaveList = async () => {
+    setIsSyncing(true);
+    try {
+      const saveOperation = async () => {
+        // Clear the remote list and upload the current local list
+        await deleteAllItemsFromFirestore();
+        const addPromises = items.map(item => addItemToFirestore(item));
+        await Promise.all(addPromises);
+      };
+      
+      await withTimeout(saveOperation(), 10000, 'Saving to the database timed out.');
+      
+      alert('List saved successfully!');
+    } catch (error) {
+      console.error("Failed to save list:", error);
+      alert(`Failed to save the list. Please check your connection and Firebase setup.\nError: ${error.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteList = async () => {
+    if (window.confirm('Are you sure you want to delete the entire list? This action cannot be undone.')) {
+      setIsSyncing(true);
+      try {
+        await withTimeout(deleteAllItemsFromFirestore(), 10000, 'Deleting from the database timed out.');
+        setItems([]); // Clear local state
+        alert('List deleted successfully!');
+      } catch (error) {
+        console.error("Failed to delete list:", error);
+        alert(`Failed to delete the list. Please check your connection and Firebase setup.\nError: ${error.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   const aggregatedItems = useMemo(() => {
@@ -126,20 +173,33 @@ export default function App(): React.ReactNode {
   }, [aggregatedItems]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-100 flex flex-col">
+    <div className="min-h-screen bg-black/10 flex flex-col">
       <Header />
        {loading ? (
             <main className="flex-grow container mx-auto p-4 max-w-2xl flex items-center justify-center">
-                <div className="text-center">
+                <div className="text-center bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-10">
                     <p className="text-slate-600 text-lg font-semibold">Loading your list...</p>
-                    <p className="text-slate-400 text-sm mt-2">Syncing with the cloud ✨</p>
+                    <p className="text-slate-400 text-sm mt-2">Connecting to the cloud ✨</p>
                 </div>
             </main>
         ) : (
           <main className="flex-grow container mx-auto p-4 max-w-2xl">
             <div className="bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-6">
-              <UserSelector currentUser={currentUser} setCurrentUser={setCurrentUser} />
               <ProgressBar progress={progress} />
+               <div className="flex justify-center gap-4 my-4 border-b border-t border-slate-200 py-4">
+                <button 
+                    onClick={handleSaveList} 
+                    disabled={isSyncing}
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-green-300 disabled:cursor-not-allowed shadow-md">
+                    {isSyncing ? 'Saving...' : 'Save List'}
+                </button>
+                <button 
+                    onClick={handleDeleteList} 
+                    disabled={isSyncing || items.length === 0}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-red-300 disabled:cursor-not-allowed shadow-md">
+                    {isSyncing ? 'Deleting...' : 'Delete List'}
+                </button>
+            </div>
               <GroceryList categorizedItems={categorizedItems} onToggleItem={toggleItemPurchased} />
             </div>
           </main>

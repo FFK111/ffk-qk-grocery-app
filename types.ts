@@ -1,5 +1,3 @@
-export type User = 'Faisal' | 'Gudiya';
-
 export interface GroceryItem {
   id: string;
   name: string;
@@ -7,10 +5,12 @@ export interface GroceryItem {
   unit: string;
   category: string;
   purchased: boolean;
-  addedBy: User;
   dateAdded: string; // ISO string
 }
 
 export type PredefinedGroceries = {
     [category: string]: string[];
 }
+
+// FIX: Exported User type to resolve missing export error in components/UserSelector.tsx
+export type User = string;
