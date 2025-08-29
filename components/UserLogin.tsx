@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { getUsersForList, createUserInList, deleteUserFromList } from '../firebase';
 import type { UserProfile } from '../types';
@@ -8,7 +6,7 @@ import { TrashIcon } from './icons/TrashIcon';
 
 interface UserLoginProps {
     listId: string;
-    onLoginSuccess: (username: string) => void;
+    onLoginSuccess: (user: UserProfile) => void;
     onSwitchList: () => void;
 }
 
@@ -88,7 +86,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                 resetToSelection();
                 fetchUsers(); // Re-fetch to show latest user list in admin mode
             } else {
-                onLoginSuccess(selectedUser.name);
+                onLoginSuccess(selectedUser);
             }
         } catch (err: any) {
             setError(err.message);
@@ -108,13 +106,14 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
         setError(null);
         
         try {
-            const lowerCaseUsername = newUsername.trim().toLowerCase();
+            const trimmedUsername = newUsername.trim();
+            const lowerCaseUsername = trimmedUsername.toLowerCase();
             if (existingUsers.some(u => u.name.toLowerCase() === lowerCaseUsername)) {
                 throw new Error('This username is already taken on this list.');
             }
             const hashedPin = await hashPin(pin);
-            await createUserInList(listId, newUsername.trim(), hashedPin);
-            onLoginSuccess(newUsername.trim());
+            const newUserProfile = await createUserInList(listId, trimmedUsername, hashedPin);
+            onLoginSuccess(newUserProfile);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -164,7 +163,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                                 <button 
                                     onClick={() => {
                                         if (adminSessionUser && adminSessionUser.name === user.name) {
-                                            onLoginSuccess(user.name);
+                                            onLoginSuccess(user);
                                         } else {
                                             setSelectedUser(user);
                                             setMode('enterPin');

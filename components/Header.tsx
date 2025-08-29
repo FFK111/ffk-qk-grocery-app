@@ -1,12 +1,14 @@
 import React from 'react';
+import type { UserProfile } from '../types';
 
 interface HeaderProps {
-    currentUser: string;
+    currentUser: UserProfile;
     onSwitchUser: () => void;
     onSwitchList: () => void;
+    onDeleteList: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onSwitchUser, onSwitchList }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onSwitchUser, onSwitchList, onDeleteList }) => {
     return (
         <header 
             className="bg-black/30 backdrop-blur-md text-slate-100 shadow-lg p-4 sticky top-0 z-40" 
@@ -18,16 +20,21 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onSwitchUser, onSwi
                         Grocery Hub & Notes
                     </h1>
                     <p className="text-sm text-slate-200">
-                        Welcome, <span className="font-bold">{currentUser}</span>
+                        Welcome, <span className="font-bold">{currentUser.name}</span>
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                      <button onClick={onSwitchUser} className="text-sm font-semibold bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-md transition-colors">
                         Switch User
                     </button>
                     <button onClick={onSwitchList} className="text-sm font-semibold bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-md transition-colors">
                         Switch List
                     </button>
+                    {currentUser.isAdmin && (
+                         <button onClick={onDeleteList} className="text-sm font-semibold bg-red-500/20 hover:bg-red-500/40 text-red-200 py-1.5 px-3 rounded-md transition-colors">
+                            Delete List
+                        </button>
+                    )}
                 </div>
             </div>
         </header>

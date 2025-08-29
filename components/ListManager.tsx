@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getAllListIds } from '../firebase';
 
 interface ListManagerProps {
     onListSelected: (listId: string) => void;
@@ -16,6 +17,23 @@ const generateListId = () => {
 
 export const ListManager: React.FC<ListManagerProps> = ({ onListSelected }) => {
     const [joinInput, setJoinInput] = useState('');
+    const [existingLists, setExistingLists] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+        getAllListIds()
+            .then(lists => {
+                setExistingLists(lists);
+            })
+            .catch(error => {
+                console.error("Failed to fetch existing lists:", error);
+                alert("Could not load public lists. You can still join a list by entering its ID manually.");
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
+    }, []);
 
     const handleCreateList = () => {
         const newListId = generateListId();
@@ -71,7 +89,7 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected }) => {
                                 value={joinInput}
                                 onChange={(e) => setJoinInput(e.target.value)}
                                 className="block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center"
-                                placeholder="Enter List ID (e.g., happy-river-123)"
+                                placeholder="Enter List ID manually"
                                 required
                             />
                         </div>
@@ -83,6 +101,27 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected }) => {
                         </button>
                     </form>
                 </div>
+                
+                 {isLoading ? (
+                    <div className="text-center text-slate-500">Loading public lists...</div>
+                ) : (
+                    existingLists.length > 0 && (
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-700 text-center mb-3">Or join a public list:</h3>
+                            <div className="max-h-32 overflow-y-auto space-y-2 rounded-lg bg-black/5 p-2">
+                                {existingLists.map(listId => (
+                                    <button 
+                                        key={listId}
+                                        onClick={() => onListSelected(listId)}
+                                        className="w-full text-center bg-white/80 p-2 rounded-md font-semibold text-slate-800 hover:bg-blue-100 transition-colors"
+                                    >
+                                        {listId}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )
+                )}
             </div>
         </div>
     );

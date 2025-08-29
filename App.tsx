@@ -6,7 +6,7 @@ import { AddItemModal } from './components/AddItemModal';
 import { CategorySelectorModal } from './components/CategorySelectorModal';
 import { ProgressBar } from './components/ProgressBar';
 import { PlusIcon } from './components/icons/PlusIcon';
-import type { GroceryItem, NewGroceryItem } from './types';
+import type { GroceryItem, NewGroceryItem, UserProfile } from './types';
 import { PREDEFINED_GROCERIES } from './constants';
 import { 
   subscribeToItems, 
@@ -14,6 +14,7 @@ import {
   togglePurchasedByName,
   deleteItemsByName,
   deletePurchasedItems,
+  deleteList,
 } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ListManager } from './components/ListManager';
@@ -29,7 +30,7 @@ export default function App(): React.ReactNode {
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
   const [currentListId, setCurrentListId] = useLocalStorage<string | null>('currentListId', null);
-  const [currentUser, setCurrentUser] = useLocalStorage<string | null>('currentUser', null);
+  const [currentUser, setCurrentUser] = useLocalStorage<UserProfile | null>('currentUser', null);
   
   useEffect(() => {
     if (!currentListId || !currentUser) return;
@@ -121,6 +122,20 @@ export default function App(): React.ReactNode {
     setCurrentUser(null);
   }
 
+  const handleDeleteList = async () => {
+    if (!currentListId || !currentUser?.isAdmin) return;
+    if (window.confirm(`ARE YOU SURE?\n\nYou are about to delete the entire list "${currentListId}". This will remove all items and all users. This action cannot be undone.`)) {
+        try {
+            await deleteList(currentListId);
+            alert(`List "${currentListId}" has been deleted.`);
+            handleSwitchList(); // Go back to the main screen
+        } catch (error) {
+            console.error("Failed to delete list:", error);
+            alert("Could not delete the list. Please check your connection and permissions.");
+        }
+    }
+  };
+
   const aggregatedItems = useMemo(() => {
     const grouped: {
       [key: string]: {
@@ -179,7 +194,7 @@ export default function App(): React.ReactNode {
 
   return (
     <div className="min-h-screen bg-black/10 flex flex-col">
-      <Header currentUser={currentUser} onSwitchList={handleSwitchList} onSwitchUser={handleSwitchUser} />
+      <Header currentUser={currentUser} onSwitchList={handleSwitchList} onSwitchUser={handleSwitchUser} onDeleteList={handleDeleteList} />
        {isInitialSyncing ? (
             <main className="flex-grow container mx-auto p-4 max-w-2xl flex items-center justify-center">
                 <div className="text-center bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-10">
