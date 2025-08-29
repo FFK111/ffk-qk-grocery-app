@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { GroceryList } from './components/GroceryList';
@@ -6,19 +6,18 @@ import { AddItemModal } from './components/AddItemModal';
 import { CategorySelectorModal } from './components/CategorySelectorModal';
 import { ProgressBar } from './components/ProgressBar';
 import { PlusIcon } from './components/icons/PlusIcon';
-import type { GroceryItem, NewGroceryItem, UserProfile } from './types';
+import type { GroceryItem, NewGroceryItem } from './types';
 import { PREDEFINED_GROCERIES } from './constants';
-import { 
-  subscribeToItems, 
+import {
+  subscribeToItems,
   addItemToFirestore,
   togglePurchasedByName,
   deleteItemsByName,
   deletePurchasedItems,
-  deleteList,
 } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ListManager } from './components/ListManager';
-import { UserLogin } from './components/UserLogin';
+import { useEffect, useMemo } from 'react';
 
 type ModalState = {
   step: 'closed' | 'selectCategory' | 'addItem';
@@ -30,10 +29,10 @@ export default function App(): React.ReactNode {
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
   const [currentListId, setCurrentListId] = useLocalStorage<string | null>('currentListId', null);
-  const [currentUser, setCurrentUser] = useLocalStorage<UserProfile | null>('currentUser', null);
-  
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+
   useEffect(() => {
-    if (!currentListId || !currentUser) return;
+    if (!currentListId) return;
 
     setIsInitialSyncing(true);
     const unsubscribe = subscribeToItems(currentListId, (cloudItems) => {
@@ -41,15 +40,15 @@ export default function App(): React.ReactNode {
         setIsInitialSyncing(false);
     }, (error) => {
         console.error("Failed to subscribe to items:", error);
-        alert(`Could not load your list from the cloud. Please check your internet connection and permissions.\nError: ${error.message}`);
+        alert(`Could not load your list. Please check your internet connection.\nError: ${error.message}`);
         setIsInitialSyncing(false);
     });
 
     return () => unsubscribe();
-  }, [currentListId, currentUser]);
+  }, [currentListId]);
 
   const addItem = async (newItem: NewGroceryItem) => {
-    if (!currentListId || !currentUser) return;
+    if (!currentListId) return;
     const newItemWithId: GroceryItem = {
       ...newItem,
       id: `${Date.now().toString(36)}-${Math.random().toString(36).substring(2)}`,
@@ -74,9 +73,7 @@ export default function App(): React.ReactNode {
     const newPurchasedStatus = !areAllCurrentlyPurchased;
 
     try {
-        if (navigator.vibrate) {
-            navigator.vibrate(50); // Haptic feedback
-        }
+        if (navigator.vibrate) navigator.vibrate(50);
         await togglePurchasedByName(currentListId, itemName, newPurchasedStatus);
     } catch (error) {
         console.error("Error updating item status:", error);
@@ -108,32 +105,14 @@ export default function App(): React.ReactNode {
         await deletePurchasedItems(currentListId);
       } catch (error: any) {
         console.error("Failed to clear completed items:", error);
-        alert(`Failed to clear completed items. Please check your connection and Firebase setup.\nError: ${error.message}`);
+        alert(`Failed to clear completed items. Error: ${error.message}`);
       }
     }
   };
   
   const handleSwitchList = () => {
     setCurrentListId(null);
-    setCurrentUser(null);
-  };
-  
-  const handleSwitchUser = () => {
-    setCurrentUser(null);
-  }
-
-  const handleDeleteList = async () => {
-    if (!currentListId || !currentUser?.isAdmin) return;
-    if (window.confirm(`ARE YOU SURE?\n\nYou are about to delete the entire list "${currentListId}". This will remove all items and all users. This action cannot be undone.`)) {
-        try {
-            await deleteList(currentListId);
-            alert(`List "${currentListId}" has been deleted.`);
-            handleSwitchList(); // Go back to the main screen
-        } catch (error) {
-            console.error("Failed to delete list:", error);
-            alert("Could not delete the list. Please check your connection and permissions.");
-        }
-    }
+    setItems([]); // Clear items from previous list
   };
 
   const aggregatedItems = useMemo(() => {
@@ -183,18 +162,18 @@ export default function App(): React.ReactNode {
     return (purchased / total) * 100;
   }, [aggregatedItems]);
 
-
   if (!currentListId) {
-    return <ListManager onListSelected={setCurrentListId} />;
-  }
-
-  if (!currentUser) {
-    return <UserLogin listId={currentListId} onLoginSuccess={setCurrentUser} onSwitchList={handleSwitchList} />;
+    return <ListManager 
+      onListSelected={setCurrentListId} 
+      isAdmin={isAdminLoggedIn}
+      onAdminLoginSuccess={() => setIsAdminLoggedIn(true)}
+      onAdminLogout={() => setIsAdminLoggedIn(false)}
+    />;
   }
 
   return (
     <div className="min-h-screen bg-black/10 flex flex-col">
-      <Header currentUser={currentUser} onSwitchList={handleSwitchList} onSwitchUser={handleSwitchUser} onDeleteList={handleDeleteList} />
+      <Header listId={currentListId} onSwitchList={handleSwitchList} />
        {isInitialSyncing ? (
             <main className="flex-grow container mx-auto p-4 max-w-2xl flex items-center justify-center">
                 <div className="text-center bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-10">

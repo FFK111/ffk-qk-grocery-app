@@ -10,10 +10,10 @@ export interface GroceryItem {
 
 export type NewGroceryItem = Omit<GroceryItem, 'id' | 'dateAdded' | 'purchased'>;
 
-export interface UserProfile {
+export interface GroceryListInfo {
+  id: string;
   name: string;
-  pinHash: string;
-  isAdmin: boolean;
+  date: string; // Stored as 'YYYY-MM-DD'
 }
 
 export type PredefinedGroceries = {
