@@ -11,6 +11,7 @@ import {
 import type { GroceryListInfo } from '../types';
 import { XIcon } from './icons/XIcon';
 import { TrashIcon } from './icons/TrashIcon';
+import { DocumentIcon } from './icons/DocumentIcon';
 
 interface ListManagerProps {
     onListSelected: (listId: string) => void;
@@ -189,10 +190,15 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
                         <div key={list.id} className="flex items-center gap-2 group">
                              <button
                                 onClick={() => handleJoinList(list)}
-                                className="flex-1 text-left bg-white/80 p-3 rounded-lg hover:bg-blue-100 transition-colors shadow-sm w-full"
+                                className="flex-1 flex items-center gap-4 text-left bg-white/80 p-3 rounded-lg hover:bg-blue-100 transition-colors shadow-sm w-full"
                             >
-                                <p className="font-bold text-slate-800 capitalize">{list.name}</p>
-                                <p className="text-sm text-slate-500">Date: {new Date(list.date + 'T00:00:00').toLocaleDateString()}</p>
+                                <div className="bg-white p-2 rounded-lg shadow-inner">
+                                    <DocumentIcon className="w-6 h-6 text-blue-500" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-800 capitalize">{list.name}</p>
+                                    <p className="text-sm text-slate-500">Date: {new Date(list.date + 'T00:00:00').toLocaleDateString()}</p>
+                                </div>
                             </button>
                             {isAdmin && (
                                 <button

@@ -1,7 +1,5 @@
-// FIX: The 'firebase/app' module was causing errors. Switched to 'firebase/compat/app'
-// for app initialization. This is a supported method for mixing v9 modular code with
-// older initialization patterns to resolve environment-specific module issues.
-import firebase from "firebase/compat/app";
+// FIX: Use a namespace import for firebase/app to work around module resolution issues.
+import * as firebaseApp from "firebase/app";
 import { 
     getFirestore, 
     collection, 
@@ -27,6 +25,11 @@ const firebaseConfig = {
   appId: "1:442396361973:web:69ec493017e0373e5ff1bc"
 };
 
+// --- Correct v9 Initialization ---
+// FIX: Use the namespace import for app initialization functions.
+const app = firebaseApp.getApps().length === 0 ? firebaseApp.initializeApp(firebaseConfig) : firebaseApp.getApp();
+const db = getFirestore(app);
+
 // --- Utils ---
 async function hashPin(pin: string): Promise<string> {
     const encoder = new TextEncoder();
@@ -36,20 +39,12 @@ async function hashPin(pin: string): Promise<string> {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- Lazy Initializaion ---
-const getDb = () => {
-    // FIX: Using compat library's methods for app initialization.
-    const app = firebase.apps.length === 0 ? firebase.initializeApp(firebaseConfig) : firebase.app();
-    return getFirestore(app);
-}
-
 // --- Real-time Item Management ---
 export const subscribeToItems = (
     listId: string, 
     onUpdate: (items: GroceryItem[]) => void, 
     onError: (error: Error) => void
 ) => {
-  const db = getDb();
   const itemsCollectionRef = collection(db, "lists", listId, "items");
   const unsubscribe = onSnapshot(itemsCollectionRef, (querySnapshot) => {
     const items = querySnapshot.docs
@@ -65,13 +60,11 @@ export const subscribeToItems = (
 };
 
 export const addItemToFirestore = async (item: GroceryItem, listId: string): Promise<void> => {
-  const db = getDb();
   const itemDocRef = doc(db, "lists", listId, "items", item.id);
   await setDoc(itemDocRef, item);
 };
 
 export const togglePurchasedByName = async (listId: string, itemName: string, newStatus: boolean): Promise<void> => {
-    const db = getDb();
     const itemsCollectionRef = collection(db, "lists", listId, "items");
     const q = query(itemsCollectionRef, where("name", "==", itemName));
     const querySnapshot = await getDocs(q);
@@ -86,7 +79,6 @@ export const togglePurchasedByName = async (listId: string, itemName: string, ne
 };
 
 export const deleteItemsByName = async (listId: string, itemName: string): Promise<void> => {
-    const db = getDb();
     const itemsCollectionRef = collection(db, "lists", listId, "items");
     const q = query(itemsCollectionRef, where("name", "==", itemName));
     const querySnapshot = await getDocs(q);
@@ -101,7 +93,6 @@ export const deleteItemsByName = async (listId: string, itemName: string): Promi
 }
 
 export const deletePurchasedItems = async (listId: string): Promise<void> => {
-    const db = getDb();
     const itemsCollectionRef = collection(db, "lists", listId, "items");
     const q = query(itemsCollectionRef, where("purchased", "==", true));
     const querySnapshot = await getDocs(q);
@@ -117,7 +108,6 @@ export const deletePurchasedItems = async (listId: string): Promise<void> => {
 
 // --- List Management ---
 export const getPublicLists = async (): Promise<GroceryListInfo[]> => {
-    const db = getDb();
     const listsCollectionRef = collection(db, "lists");
     const querySnapshot = await getDocs(listsCollectionRef);
     return querySnapshot.docs
@@ -134,7 +124,6 @@ export const createList = async (listName: string, pin: string, date: string): P
     const listId = listName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (!listId) throw new Error("Invalid list name. Use letters and numbers.");
 
-    const db = getDb();
     const listDocRef = doc(db, "lists", listId);
     const docSnap = await getDoc(listDocRef);
     if (docSnap.exists()) {
@@ -153,7 +142,6 @@ export const createList = async (listName: string, pin: string, date: string): P
 };
 
 export const verifyListPin = async (listId: string, pin: string): Promise<boolean> => {
-    const db = getDb();
     const listDocRef = doc(db, "lists", listId);
     const docSnap = await getDoc(listDocRef);
 
@@ -172,7 +160,6 @@ export const verifyListPin = async (listId: string, pin: string): Promise<boolea
 };
 
 export const deleteList = async (listId: string): Promise<void> => {
-    const db = getDb();
     const listDocRef = doc(db, "lists", listId);
     
     // Delete all items in the subcollection first
@@ -190,14 +177,12 @@ export const deleteList = async (listId: string): Promise<void> => {
 
 // --- Admin Management ---
 export const checkAdminExists = async (): Promise<boolean> => {
-    const db = getDb();
     const adminDocRef = doc(db, "app_config", "admin_user");
     const docSnap = await getDoc(adminDocRef);
     return docSnap.exists();
 };
 
 export const createAdmin = async (username: string, password: string): Promise<void> => {
-    const db = getDb();
     const adminDocRef = doc(db, "app_config", "admin_user");
     const docSnap = await getDoc(adminDocRef);
     if (docSnap.exists()) {
@@ -208,7 +193,6 @@ export const createAdmin = async (username: string, password: string): Promise<v
 };
 
 export const verifyAdminLogin = async (username: string, password: string): Promise<boolean> => {
-    const db = getDb();
     const adminDocRef = doc(db, "app_config", "admin_user");
     const docSnap = await getDoc(adminDocRef);
     if (!docSnap.exists()) {
