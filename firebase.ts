@@ -1,5 +1,7 @@
-// FIX: Changed to namespace import for firebase/app to resolve module loading errors.
-import * as firebase from "firebase/app";
+// Fix: Changed the firebase/app import to a namespace import (`* as firebaseApp`).
+// This can help resolve module resolution errors in certain environments.
+// The `initializeApp` function and `FirebaseApp` type are now accessed via `firebaseApp`.
+import * as firebaseApp from "firebase/app";
 import { 
   getFirestore, 
   collection, 
@@ -26,13 +28,12 @@ const firebaseConfig = {
 
 // --- Lazy Initializaion ---
 // This prevents the app from crashing on startup if the config is invalid.
-let app: firebase.FirebaseApp;
+let app: firebaseApp.FirebaseApp;
 let db: Firestore;
 
 const initializeDb = () => {
     if (!app) {
-        // FIX: Call initializeApp from the firebase namespace.
-        app = firebase.initializeApp(firebaseConfig);
+        app = firebaseApp.initializeApp(firebaseConfig);
         db = getFirestore(app);
     }
     return db;
@@ -147,6 +148,7 @@ export const createUserInList = async (listId: string, username: string, pinHash
     const usersCollectionRef = collection(db, "lists", listId, "users");
 
     // The first user added to a list will automatically become an admin.
+    // Fix: Corrected typo from `usersCollectioneRef` to `usersCollectionRef`.
     const querySnapshot = await getDocs(usersCollectionRef);
     const isAdmin = querySnapshot.empty;
 
