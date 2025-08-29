@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getPublicLists, createList, verifyListPin, deleteList } from '../firebase';
+import { 
+    getPublicLists, 
+    createList, 
+    verifyListPin, 
+    deleteList, 
+    checkAdminExists, 
+    createAdmin, 
+    verifyAdminLogin 
+} from '../firebase';
 import type { GroceryListInfo } from '../types';
 import { XIcon } from './icons/XIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -10,8 +18,6 @@ interface ListManagerProps {
     onAdminLoginSuccess: () => void;
     onAdminLogout: () => void;
 }
-
-const ADMIN_PASSWORD = 'admin123';
 
 export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmin, onAdminLoginSuccess, onAdminLogout }) => {
     const [lists, setLists] = useState<GroceryListInfo[]>([]);
@@ -30,8 +36,12 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
     const [newListPin, setNewListPin] = useState('');
     const [newListDate, setNewListDate] = useState(new Date().toISOString().split('T')[0]);
     const [pinInput, setPinInput] = useState('');
-    const [adminPassInput, setAdminPassInput] = useState('');
     
+    // Admin form inputs
+    const [adminUsername, setAdminUsername] = useState('');
+    const [adminPassInput, setAdminPassInput] = useState('');
+    const [adminExists, setAdminExists] = useState(true);
+
     const fetchLists = () => {
         setIsLoading(true);
         getPublicLists()
@@ -46,6 +56,7 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
 
     useEffect(() => {
         fetchLists();
+        checkAdminExists().then(setAdminExists);
     }, []);
 
     const handleCreateList = async (e: React.FormEvent) => {
@@ -100,14 +111,34 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
         }
     };
 
-    const handleAdminLogin = (e: React.FormEvent) => {
+    const handleAdminSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (adminPassInput === ADMIN_PASSWORD) {
-            onAdminLoginSuccess();
-            setAdminModalOpen(false);
-            setAdminPassInput('');
-        } else {
-            setError("Incorrect admin password.");
+        setError('');
+        setIsLoading(true);
+        try {
+            if (adminExists) {
+                const isLoggedIn = await verifyAdminLogin(adminUsername, adminPassInput);
+                if (isLoggedIn) {
+                    onAdminLoginSuccess();
+                    setAdminModalOpen(false);
+                } else {
+                    setError("Incorrect username or password.");
+                }
+            } else {
+                if (adminUsername.trim().length < 4 || adminPassInput.length < 6) {
+                    setError("Username must be at least 4 characters and password at least 6.");
+                    setIsLoading(false);
+                    return;
+                }
+                await createAdmin(adminUsername, adminPassInput);
+                setAdminExists(true);
+                onAdminLoginSuccess();
+                setAdminModalOpen(false);
+            }
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -120,6 +151,13 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
                 alert("Failed to delete list.");
             }
         }
+    };
+
+    const openAdminModal = () => {
+        setError('');
+        setAdminUsername('');
+        setAdminPassInput('');
+        setAdminModalOpen(true);
     };
 
     return (
@@ -172,7 +210,7 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
                     {isAdmin ? (
                          <button onClick={onAdminLogout} className="text-sm text-red-600 hover:underline">Logout Admin</button>
                     ) : (
-                         <button onClick={() => setAdminModalOpen(true)} className="text-sm text-slate-600 hover:underline">Admin Login</button>
+                         <button onClick={openAdminModal} className="text-sm text-slate-600 hover:underline">Admin Login</button>
                     )}
                 </div>
             </div>
@@ -219,11 +257,17 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected, isAdmi
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative">
                         <button onClick={() => setAdminModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><XIcon className="w-6 h-6" /></button>
-                        <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Admin Login</h2>
-                        <form onSubmit={handleAdminLogin} className="space-y-4">
-                            <input type="password" value={adminPassInput} onChange={e => setAdminPassInput(e.target.value)} placeholder="Enter Admin Password" required autoFocus className="w-full p-3 border rounded"/>
+                        <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">
+                            {adminExists ? 'Admin Login' : 'Create Admin Account'}
+                        </h2>
+                        {!adminExists && <p className="text-sm text-center text-slate-500 mb-4">Set up the single administrator account for this app.</p>}
+                        <form onSubmit={handleAdminSubmit} className="space-y-4">
+                            <input type="text" value={adminUsername} onChange={e => setAdminUsername(e.target.value)} placeholder="Admin Username" required autoFocus className="w-full p-3 border rounded"/>
+                            <input type="password" value={adminPassInput} onChange={e => setAdminPassInput(e.target.value)} placeholder="Password" required className="w-full p-3 border rounded"/>
                             {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-                            <button type="submit" className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-900">Login</button>
+                            <button type="submit" disabled={isLoading} className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-900">
+                                {isLoading ? 'Processing...' : (adminExists ? 'Login' : 'Create Account')}
+                            </button>
                         </form>
                     </div>
                 </div>

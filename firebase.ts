@@ -1,6 +1,7 @@
-
-
-import * as firebaseApp from "firebase/app";
+// FIX: The 'firebase/app' module was causing errors. Switched to 'firebase/compat/app'
+// for app initialization. This is a supported method for mixing v9 modular code with
+// older initialization patterns to resolve environment-specific module issues.
+import firebase from "firebase/compat/app";
 import { 
     getFirestore, 
     collection, 
@@ -10,9 +11,9 @@ import {
     query, 
     where, 
     getDocs, 
-    writeBatch, 
+    writeBatch,
+    getDoc,
     deleteDoc,
-    getDoc
 } from "firebase/firestore";
 
 import type { GroceryItem, GroceryListInfo } from "./types";
@@ -31,17 +32,16 @@ async function hashPin(pin: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(pin);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    // FIX: Corrected typo from UintByteArray to Uint8Array.
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- Lazy Initialization ---
+// --- Lazy Initializaion ---
 const getDb = () => {
-    // FIX: Use namespace import to address module export errors.
-    const app = firebaseApp.getApps().length === 0 ? firebaseApp.initializeApp(firebaseConfig) : firebaseApp.getApp();
+    // FIX: Using compat library's methods for app initialization.
+    const app = firebase.apps.length === 0 ? firebase.initializeApp(firebaseConfig) : firebase.app();
     return getFirestore(app);
-};
+}
 
 // --- Real-time Item Management ---
 export const subscribeToItems = (
@@ -51,8 +51,7 @@ export const subscribeToItems = (
 ) => {
   const db = getDb();
   const itemsCollectionRef = collection(db, "lists", listId, "items");
-  const q = query(itemsCollectionRef);
-  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+  const unsubscribe = onSnapshot(itemsCollectionRef, (querySnapshot) => {
     const items = querySnapshot.docs
         .map(doc => doc.data())
         .filter(data => data && typeof data.id === 'string' && typeof data.name === 'string')
@@ -132,10 +131,10 @@ export const getPublicLists = async (): Promise<GroceryListInfo[]> => {
 };
 
 export const createList = async (listName: string, pin: string, date: string): Promise<string> => {
-    const db = getDb();
     const listId = listName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (!listId) throw new Error("Invalid list name. Use letters and numbers.");
 
+    const db = getDb();
     const listDocRef = doc(db, "lists", listId);
     const docSnap = await getDoc(listDocRef);
     if (docSnap.exists()) {
@@ -176,7 +175,8 @@ export const deleteList = async (listId: string): Promise<void> => {
     const db = getDb();
     const listDocRef = doc(db, "lists", listId);
     
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
+    // Delete all items in the subcollection first
+    const itemsCollectionRef = collection(listDocRef, "items");
     const snapshot = await getDocs(itemsCollectionRef);
     if (!snapshot.empty) {
         const batch = writeBatch(db);
@@ -184,5 +184,40 @@ export const deleteList = async (listId: string): Promise<void> => {
         await batch.commit();
     }
     
+    // Then delete the list document itself
     await deleteDoc(listDocRef);
+};
+
+// --- Admin Management ---
+export const checkAdminExists = async (): Promise<boolean> => {
+    const db = getDb();
+    const adminDocRef = doc(db, "app_config", "admin_user");
+    const docSnap = await getDoc(adminDocRef);
+    return docSnap.exists();
+};
+
+export const createAdmin = async (username: string, password: string): Promise<void> => {
+    const db = getDb();
+    const adminDocRef = doc(db, "app_config", "admin_user");
+    const docSnap = await getDoc(adminDocRef);
+    if (docSnap.exists()) {
+        throw new Error("An admin account already exists.");
+    }
+    const passwordHash = await hashPin(password);
+    await setDoc(adminDocRef, { username, passwordHash });
+};
+
+export const verifyAdminLogin = async (username: string, password: string): Promise<boolean> => {
+    const db = getDb();
+    const adminDocRef = doc(db, "app_config", "admin_user");
+    const docSnap = await getDoc(adminDocRef);
+    if (!docSnap.exists()) {
+        throw new Error("Admin account not found.");
+    }
+    const adminData = docSnap.data();
+    if (!adminData || adminData.username !== username) {
+        return false;
+    }
+    const providedPasswordHash = await hashPin(password);
+    return adminData.passwordHash === providedPasswordHash;
 };
