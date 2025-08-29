@@ -5,14 +5,12 @@ import { GroceryList } from './components/GroceryList';
 import { AddItemModal } from './components/AddItemModal';
 import { CategorySelectorModal } from './components/CategorySelectorModal';
 import { ProgressBar } from './components/ProgressBar';
-import { SmartAddItemModal } from './components/SmartAddItemModal';
-import { FloatingActionButtons } from './components/FloatingActionButtons';
+import { PlusIcon } from './components/icons/PlusIcon';
 import type { GroceryItem, NewGroceryItem } from './types';
 import { PREDEFINED_GROCERIES } from './constants';
 import { 
   subscribeToItems, 
   addItemToFirestore,
-  addMultipleItemsToFirestore,
   togglePurchasedByName,
   deleteItemsByName,
   deletePurchasedItems,
@@ -30,7 +28,6 @@ export default function App(): React.ReactNode {
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
-  const [isSmartModalOpen, setIsSmartModalOpen] = useState(false);
   const [currentListId, setCurrentListId] = useLocalStorage<string | null>('currentListId', null);
   const [currentUser, setCurrentUser] = useLocalStorage<string | null>('currentUser', null);
   
@@ -64,17 +61,6 @@ export default function App(): React.ReactNode {
     } catch (error) {
         console.error("Failed to add item:", error);
         alert("Could not add the item. Please check your connection.");
-    }
-  };
-
-  const handleSmartAdd = async (newItems: NewGroceryItem[]) => {
-    if (!currentListId || !currentUser || newItems.length === 0) return;
-    try {
-      await addMultipleItemsToFirestore(newItems, currentListId);
-      setIsSmartModalOpen(false);
-    } catch (error) {
-      console.error("Failed to add items via smart add:", error);
-      alert("Could not add the items. Please check your connection.");
     }
   };
 
@@ -219,10 +205,13 @@ export default function App(): React.ReactNode {
         )}
       <Footer />
       
-      <FloatingActionButtons
-        onManualAdd={() => setModalState({ step: 'selectCategory' })}
-        onSmartAdd={() => setIsSmartModalOpen(true)}
-      />
+      <button
+        onClick={() => setModalState({ step: 'selectCategory' })}
+        className="fixed bottom-5 right-5 h-16 w-16 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-110 z-50"
+        aria-label="Add new item"
+      >
+        <PlusIcon className="w-8 h-8" />
+      </button>
 
       {modalState.step === 'selectCategory' && (
         <CategorySelectorModal
@@ -238,14 +227,6 @@ export default function App(): React.ReactNode {
           category={modalState.category}
           predefinedGroceries={PREDEFINED_GROCERIES}
           onGoBack={() => setModalState({ step: 'selectCategory' })}
-        />
-      )}
-
-      {isSmartModalOpen && (
-        <SmartAddItemModal
-          onClose={() => setIsSmartModalOpen(false)}
-          onAddItems={handleSmartAdd}
-          categories={Object.keys(PREDEFINED_GROCERIES)}
         />
       )}
     </div>

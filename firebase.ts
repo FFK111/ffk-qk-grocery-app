@@ -1,6 +1,7 @@
 // FIX: The Firebase v9 modular API was causing import errors. Refactored to use the v8 namespaced API for broader compatibility.
-import firebase from "firebase/app";
-import "firebase/firestore";
+// FIX: Use compat imports for Firebase v9+ to support v8 syntax.
+import firebase from "firebase/compat/app";
+import "firebase/compat/firestore";
 import type { GroceryItem, UserProfile, NewGroceryItem } from "./types";
 
 const firebaseConfig = {
@@ -52,25 +53,6 @@ export const addItemToFirestore = async (item: GroceryItem, listId: string): Pro
   const db = initializeDb();
   const itemDocRef = db.collection("lists").doc(listId).collection("items").doc(item.id);
   await itemDocRef.set(item);
-};
-
-export const addMultipleItemsToFirestore = async (items: NewGroceryItem[], listId: string): Promise<void> => {
-    const db = initializeDb();
-    const batch = db.batch();
-
-    items.forEach(item => {
-        const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2)}`;
-        const newItemWithId: GroceryItem = {
-            ...item,
-            id,
-            dateAdded: new Date().toISOString(),
-            purchased: false,
-        };
-        const itemDocRef = db.collection("lists").doc(listId).collection("items").doc(id);
-        batch.set(itemDocRef, newItemWithId);
-    });
-
-    await batch.commit();
 };
 
 export const togglePurchasedByName = async (listId: string, itemName: string, newStatus: boolean): Promise<void> => {
