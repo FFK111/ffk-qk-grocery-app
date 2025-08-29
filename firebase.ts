@@ -1,19 +1,18 @@
-// FIX: Use a namespace import for firebase/app to work around module resolution issues.
-import * as firebaseApp from "firebase/app";
-import { 
-    getFirestore, 
-    collection, 
-    doc, 
-    onSnapshot, 
-    setDoc, 
-    query, 
-    where, 
-    getDocs, 
+// Fix: Use firebase/compat/app for initialization to resolve module export errors.
+import firebase from 'firebase/compat/app';
+import {
+    getFirestore,
+    collection,
+    doc,
+    onSnapshot,
+    setDoc,
+    query,
+    where,
+    getDocs,
     writeBatch,
-    getDoc,
     deleteDoc,
+    getDoc
 } from "firebase/firestore";
-
 import type { GroceryItem, GroceryListInfo } from "./types";
 
 const firebaseConfig = {
@@ -25,10 +24,10 @@ const firebaseConfig = {
   appId: "1:442396361973:web:69ec493017e0373e5ff1bc"
 };
 
-// --- Correct v9 Initialization ---
-// FIX: Use the namespace import for app initialization functions.
-const app = firebaseApp.getApps().length === 0 ? firebaseApp.initializeApp(firebaseConfig) : firebaseApp.getApp();
+// Fix: Use the compatibilty API for app initialization to prevent re-initialization on hot-reloads.
+const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
 const db = getFirestore(app);
+
 
 // --- Utils ---
 async function hashPin(pin: string): Promise<string> {
@@ -163,7 +162,7 @@ export const deleteList = async (listId: string): Promise<void> => {
     const listDocRef = doc(db, "lists", listId);
     
     // Delete all items in the subcollection first
-    const itemsCollectionRef = collection(listDocRef, "items");
+    const itemsCollectionRef = collection(db, "lists", listId, "items");
     const snapshot = await getDocs(itemsCollectionRef);
     if (!snapshot.empty) {
         const batch = writeBatch(db);
@@ -173,35 +172,4 @@ export const deleteList = async (listId: string): Promise<void> => {
     
     // Then delete the list document itself
     await deleteDoc(listDocRef);
-};
-
-// --- Admin Management ---
-export const checkAdminExists = async (): Promise<boolean> => {
-    const adminDocRef = doc(db, "app_config", "admin_user");
-    const docSnap = await getDoc(adminDocRef);
-    return docSnap.exists();
-};
-
-export const createAdmin = async (username: string, password: string): Promise<void> => {
-    const adminDocRef = doc(db, "app_config", "admin_user");
-    const docSnap = await getDoc(adminDocRef);
-    if (docSnap.exists()) {
-        throw new Error("An admin account already exists.");
-    }
-    const passwordHash = await hashPin(password);
-    await setDoc(adminDocRef, { username, passwordHash });
-};
-
-export const verifyAdminLogin = async (username: string, password: string): Promise<boolean> => {
-    const adminDocRef = doc(db, "app_config", "admin_user");
-    const docSnap = await getDoc(adminDocRef);
-    if (!docSnap.exists()) {
-        throw new Error("Admin account not found.");
-    }
-    const adminData = docSnap.data();
-    if (!adminData || adminData.username !== username) {
-        return false;
-    }
-    const providedPasswordHash = await hashPin(password);
-    return adminData.passwordHash === providedPasswordHash;
 };

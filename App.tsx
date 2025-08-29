@@ -14,6 +14,7 @@ import {
   togglePurchasedByName,
   deleteItemsByName,
   deletePurchasedItems,
+  deleteList,
 } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ListManager } from './components/ListManager';
@@ -29,7 +30,6 @@ export default function App(): React.ReactNode {
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
   const [currentListId, setCurrentListId] = useLocalStorage<string | null>('currentListId', null);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   useEffect(() => {
     if (!currentListId) return;
@@ -115,6 +115,19 @@ export default function App(): React.ReactNode {
     setItems([]); // Clear items from previous list
   };
 
+  const handleDeleteCurrentList = async () => {
+    if (!currentListId) return;
+    if (window.confirm(`Are you sure you want to permanently delete this list? This action cannot be undone.`)) {
+        try {
+            await deleteList(currentListId);
+            handleSwitchList(); // Go back to the list manager
+        } catch (error) {
+            console.error("Failed to delete list:", error);
+            alert("Could not delete the list. Please try again.");
+        }
+    }
+  };
+
   const aggregatedItems = useMemo(() => {
     const grouped: {
       [key: string]: {
@@ -165,15 +178,12 @@ export default function App(): React.ReactNode {
   if (!currentListId) {
     return <ListManager 
       onListSelected={setCurrentListId} 
-      isAdmin={isAdminLoggedIn}
-      onAdminLoginSuccess={() => setIsAdminLoggedIn(true)}
-      onAdminLogout={() => setIsAdminLoggedIn(false)}
     />;
   }
 
   return (
     <div className="min-h-screen bg-black/10 flex flex-col">
-      <Header listId={currentListId} onSwitchList={handleSwitchList} />
+      <Header listId={currentListId} onSwitchList={handleSwitchList} onDeleteList={handleDeleteCurrentList} />
        {isInitialSyncing ? (
             <main className="flex-grow container mx-auto p-4 max-w-2xl flex items-center justify-center">
                 <div className="text-center bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-10">

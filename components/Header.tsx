@@ -3,9 +3,10 @@ import React from 'react';
 interface HeaderProps {
     listId: string;
     onSwitchList: () => void;
+    onDeleteList: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ listId, onSwitchList }) => {
+export const Header: React.FC<HeaderProps> = ({ listId, onSwitchList, onDeleteList }) => {
     return (
         <header 
             className="bg-black/30 backdrop-blur-md text-slate-100 shadow-lg p-4 sticky top-0 z-40" 
@@ -23,6 +24,9 @@ export const Header: React.FC<HeaderProps> = ({ listId, onSwitchList }) => {
                 <div className="flex flex-wrap items-center justify-end gap-2">
                     <button onClick={onSwitchList} className="text-sm font-semibold bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-md transition-colors">
                         Switch List
+                    </button>
+                    <button onClick={onDeleteList} className="text-sm font-semibold bg-red-600/50 hover:bg-red-600/80 text-white py-1.5 px-3 rounded-md transition-colors">
+                        Delete List
                     </button>
                 </div>
             </div>
