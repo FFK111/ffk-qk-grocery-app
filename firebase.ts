@@ -1,4 +1,5 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
+// FIX: Changed to a namespace import to resolve potential module resolution errors with Firebase.
+import * as firebase from "firebase/app";
 import { 
   getFirestore, 
   collection, 
@@ -12,7 +13,7 @@ import {
   Firestore,
   deleteDoc,
 } from "firebase/firestore";
-import type { GroceryItem, UserProfile } from "./types";
+import type { GroceryItem, UserProfile, NewGroceryItem } from "./types";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5XMfEYTKOEUMomtD4Wdqf88OjrCJtsBE",
@@ -25,12 +26,14 @@ const firebaseConfig = {
 
 // --- Lazy Initializaion ---
 // This prevents the app from crashing on startup if the config is invalid.
-let app: FirebaseApp;
+// FIX: Use the FirebaseApp type from the imported firebase namespace.
+let app: firebase.FirebaseApp;
 let db: Firestore;
 
 const initializeDb = () => {
     if (!app) {
-        app = initializeApp(firebaseConfig);
+        // FIX: Call initializeApp from the imported firebase namespace.
+        app = firebase.initializeApp(firebaseConfig);
         db = getFirestore(app);
     }
     return db;
@@ -62,6 +65,25 @@ export const addItemToFirestore = async (item: GroceryItem, listId: string): Pro
   const db = initializeDb();
   const itemDocRef = doc(db, "lists", listId, "items", item.id);
   await setDoc(itemDocRef, item);
+};
+
+export const addMultipleItemsToFirestore = async (items: NewGroceryItem[], listId: string): Promise<void> => {
+    const db = initializeDb();
+    const batch = writeBatch(db);
+
+    items.forEach(item => {
+        const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2)}`;
+        const newItemWithId: GroceryItem = {
+            ...item,
+            id,
+            dateAdded: new Date().toISOString(),
+            purchased: false,
+        };
+        const itemDocRef = doc(db, "lists", listId, "items", id);
+        batch.set(itemDocRef, newItemWithId);
+    });
+
+    await batch.commit();
 };
 
 export const togglePurchasedByName = async (listId: string, itemName: string, newStatus: boolean): Promise<void> => {

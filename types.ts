@@ -8,6 +8,8 @@ export interface GroceryItem {
   dateAdded: string; // ISO string
 }
 
+export type NewGroceryItem = Omit<GroceryItem, 'id' | 'dateAdded' | 'purchased'>;
+
 export interface UserProfile {
   name: string;
   pinHash: string;

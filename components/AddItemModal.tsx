@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import type { GroceryItem, PredefinedGroceries } from '../types';
+import type { NewGroceryItem, PredefinedGroceries } from '../types';
 import { XIcon } from './icons/XIcon';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
 
 interface AddItemModalProps {
     onClose: () => void;
-    onAddItem: (item: Omit<GroceryItem, 'id' | 'dateAdded' | 'purchased'>) => void;
+    onAddItem: (item: NewGroceryItem) => void;
     category: string;
     predefinedGroceries: PredefinedGroceries;
     onGoBack: () => void;
