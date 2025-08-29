@@ -1,4 +1,4 @@
-// FIX: Changed to a namespace import to resolve potential module resolution errors with Firebase.
+// FIX: Changed to namespace import for firebase/app to resolve module loading errors.
 import * as firebase from "firebase/app";
 import { 
   getFirestore, 
@@ -10,7 +10,7 @@ import {
   onSnapshot,
   query,
   where,
-  Firestore,
+  type Firestore,
   deleteDoc,
 } from "firebase/firestore";
 import type { GroceryItem, UserProfile, NewGroceryItem } from "./types";
@@ -26,13 +26,12 @@ const firebaseConfig = {
 
 // --- Lazy Initializaion ---
 // This prevents the app from crashing on startup if the config is invalid.
-// FIX: Use the FirebaseApp type from the imported firebase namespace.
 let app: firebase.FirebaseApp;
 let db: Firestore;
 
 const initializeDb = () => {
     if (!app) {
-        // FIX: Call initializeApp from the imported firebase namespace.
+        // FIX: Call initializeApp from the firebase namespace.
         app = firebase.initializeApp(firebaseConfig);
         db = getFirestore(app);
     }
