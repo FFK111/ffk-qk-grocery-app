@@ -1,5 +1,8 @@
-// FIX: Using namespace import for firebase/app to resolve module loading errors, as named exports were not found.
-import * as FirebaseApp from "firebase/app";
+
+// FIX: Switched from an incorrect namespace import (`import * as FirebaseApp`) to named imports
+// for `firebase/app` as required by the Firebase modular SDK. This resolves errors where
+// `getApps`, `initializeApp`, and `getApp` were not found.
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
     getFirestore, 
     collection, 
@@ -11,7 +14,7 @@ import {
     getDocs,
     writeBatch,
     deleteDoc,
-    collectionGroup,
+    getDoc,
 } from "firebase/firestore";
 import type { GroceryItem, UserProfile } from "./types";
 
@@ -26,10 +29,10 @@ const firebaseConfig = {
 
 // --- Lazy Initialization ---
 const getDb = () => {
-    if (FirebaseApp.getApps().length === 0) {
-        FirebaseApp.initializeApp(firebaseConfig);
+    if (getApps().length === 0) {
+        initializeApp(firebaseConfig);
     }
-    return getFirestore(FirebaseApp.getApp());
+    return getFirestore(getApp());
 };
 
 // --- Real-time Item Management ---
@@ -147,6 +150,13 @@ export const getAllListIds = async (): Promise<string[]> => {
     const listsCollectionRef = collection(db, "lists");
     const querySnapshot = await getDocs(listsCollectionRef);
     return querySnapshot.docs.map(doc => doc.id);
+};
+
+export const checkListExists = async (listId: string): Promise<boolean> => {
+    const db = getDb();
+    const listDocRef = doc(db, "lists", listId);
+    const docSnap = await getDoc(listDocRef);
+    return docSnap.exists();
 };
 
 export const deleteList = async (listId: string): Promise<void> => {

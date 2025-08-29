@@ -1,24 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { getAllListIds } from '../firebase';
+import { getAllListIds, checkListExists } from '../firebase';
 
 interface ListManagerProps {
     onListSelected: (listId: string) => void;
 }
 
-const ADJECTIVES = ['Sunny', 'Happy', 'Lucky', 'Brave', 'Clever', 'Golden', 'Vivid', 'Silent', 'Witty', 'Cosmic'];
-const NOUNS = ['River', 'Mountain', 'Meadow', 'Star', 'Ocean', 'Forest', 'Valley', 'Pond', 'Desert', 'Planet'];
-
-const generateListId = () => {
-    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-    const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-    const num = Math.floor(100 + Math.random() * 900);
-    return `${adj.toLowerCase()}-${noun.toLowerCase()}-${num}`;
-}
-
 export const ListManager: React.FC<ListManagerProps> = ({ onListSelected }) => {
     const [joinInput, setJoinInput] = useState('');
+    const [newListName, setNewListName] = useState('');
     const [existingLists, setExistingLists] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isCreating, setIsCreating] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         setIsLoading(true);
@@ -35,10 +28,33 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected }) => {
             });
     }, []);
 
-    const handleCreateList = () => {
-        const newListId = generateListId();
-        alert(`Your new List ID is: ${newListId}\n\nShare this ID with others so they can join your list!`);
-        onListSelected(newListId);
+    const handleCreateList = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!newListName.trim()) {
+            setError('List name cannot be empty.');
+            return;
+        }
+
+        const proposedId = newListName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (!proposedId) {
+            setError('Please enter a valid list name with letters or numbers.');
+            return;
+        }
+
+        setIsCreating(true);
+        try {
+            const exists = await checkListExists(proposedId);
+            if (exists) {
+                setError('This list name is already taken. Please choose another.');
+            } else {
+                onListSelected(proposedId);
+            }
+        } catch (err) {
+            setError('Could not verify list name. Please try again.');
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     const handleJoinSubmit = (e: React.FormEvent) => {
@@ -61,12 +77,28 @@ export const ListManager: React.FC<ListManagerProps> = ({ onListSelected }) => {
             <div className="w-full max-w-sm bg-white/50 backdrop-blur-sm rounded-2xl shadow-lg p-8 space-y-8">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 text-center mb-4">Create a New List</h2>
-                    <button
-                        onClick={handleCreateList}
-                        className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-md"
-                    >
-                        Create & Start
-                    </button>
+                    <form onSubmit={handleCreateList} className="space-y-3">
+                        <div>
+                            <label htmlFor="new-list-name" className="sr-only">New List Name</label>
+                            <input
+                                type="text"
+                                id="new-list-name"
+                                value={newListName}
+                                onChange={(e) => setNewListName(e.target.value)}
+                                className="block w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center"
+                                placeholder="Enter a new list name"
+                                required
+                            />
+                        </div>
+                        {error && <p className="text-sm text-red-600 bg-red-100 p-2 rounded-md text-center">{error}</p>}
+                        <button
+                            type="submit"
+                            disabled={isCreating}
+                            className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-md disabled:bg-blue-300"
+                        >
+                            {isCreating ? 'Creating...' : 'Create & Start'}
+                        </button>
+                    </form>
                 </div>
 
                 <div className="relative">

@@ -246,7 +246,12 @@ export const UserLogin: React.FC<UserLoginProps> = ({ listId, onLoginSuccess, on
                             <ArrowLeftIcon className="w-6 h-6" />
                         </button>
                     )}
-                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-6">{existingUsers.length > 0 ? 'Create New User' : 'Create First User (Admin)'}</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-2">{existingUsers.length > 0 ? 'Create New User' : 'Create First User'}</h2>
+                     {existingUsers.length === 0 && (
+                        <p className="text-center text-sm text-slate-600 mb-6">
+                            The first user on a list automatically becomes the <strong>admin</strong>.
+                        </p>
+                    )}
                     <form onSubmit={handleCreateUserSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="username" className="block text-sm font-medium text-slate-700">Your Name</label>
