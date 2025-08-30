@@ -170,10 +170,17 @@ export default function App(): React.ReactNode {
         return;
     }
 
-    setIsHealthModalOpen(true);
-    setIsGeneratingTips(true);
     setHealthTips('');
     setTipsError(null);
+    setIsHealthModalOpen(true);
+    
+    // Proactively check for API key configuration.
+    if (!process.env.API_KEY) {
+        setTipsError("CONFIG_ERROR");
+        return;
+    }
+
+    setIsGeneratingTips(true);
 
     const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
 

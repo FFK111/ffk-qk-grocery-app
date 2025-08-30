@@ -1,6 +1,7 @@
 import React from 'react';
 import { XIcon } from './icons/XIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { ConfigError } from './ConfigError';
 
 interface SmartShopperModalProps {
     isOpen: boolean;
@@ -52,6 +53,8 @@ const formatTips = (text: string): string => {
 export const SmartShopperModal: React.FC<SmartShopperModalProps> = ({ isOpen, onClose, tips, isLoading, error }) => {
     if (!isOpen) return null;
 
+    const isConfigError = error === 'CONFIG_ERROR';
+
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={onClose}>
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -75,7 +78,9 @@ export const SmartShopperModal: React.FC<SmartShopperModalProps> = ({ isOpen, on
                             <p className="text-slate-400 text-sm mt-2">Please wait a moment while AI analyzes your list.</p>
                         </div>
                     )}
-                    {error && (
+                    {isConfigError && <ConfigError />}
+                    
+                    {error && !isConfigError && (
                         <div className="text-center p-4 bg-red-50 text-red-700 rounded-lg">
                             <p className="font-bold">Oops! Something went wrong.</p>
                             <p className="text-sm">{error}</p>
