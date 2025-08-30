@@ -1,6 +1,6 @@
 // FIX: Rewritten to use the modern v9+ modular API, which is required by Firebase v12 and fixes the "blank screen" startup crash.
-// FIX: Switched to a namespace import for `firebase/app` to work around potential module resolution issues that prevent named imports from being found.
-import * as firebaseApp from 'firebase/app';
+// FIX: Switched to named imports for `firebase/app` for compatibility with ES module standards. The namespace import was causing resolution errors.
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { 
     getFirestore, 
     collection, 
@@ -29,8 +29,8 @@ const firebaseConfig = {
 
 // --- Lazy & Safe Initialization ---
 // This prevents re-initialization during hot-reloads in development environments.
-// FIX: Updated to use the `firebaseApp` namespace for initialization functions and types.
-const app: firebaseApp.FirebaseApp = !firebaseApp.getApps().length ? firebaseApp.initializeApp(firebaseConfig) : firebaseApp.getApp();
+// FIX: Updated to use direct function calls from named imports.
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db: Firestore = getFirestore(app);
 
 
