@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { GroceryList } from './components/GroceryList';
@@ -38,7 +37,6 @@ export default function App(): React.ReactNode {
   const [healthTips, setHealthTips] = useState('');
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
   const [tipsError, setTipsError] = useState<string | null>(null);
-  const [advisorMode, setAdvisorMode] = useState<'live' | 'demo'>('live');
 
 
   useEffect(() => {
@@ -175,45 +173,29 @@ export default function App(): React.ReactNode {
     setHealthTips('');
     setTipsError(null);
     setIsHealthModalOpen(true);
-    
-    // Proactively check for API key configuration, using the Vercel-compatible name.
-    if (!process.env.REACT_APP_API_KEY) {
-        setAdvisorMode('demo');
-        return;
-    }
-    
-    setAdvisorMode('live');
     setIsGeneratingTips(true);
 
     const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
 
-    const prompt = `
-    You are a "Health & Wellness Advisor".
-    Analyze the following grocery list: ${itemList}.
-
-    Based on this list, provide brief and simple health tips in tailored bullet points. Your advice should be based on generally accepted, reliable health information. Do not provide medical advice.
-
-    For key items on the list, please provide:
-    1.  **Key Health Benefits**: What are the main positive effects of consuming this item?
-    2.  **Consumption Tips & Precautions**: Any advice on preparation, consumption, or potential precautions.
-    3.  **Optimal Consumption Time**: Suggest when it might be best to eat the item for maximum benefit (e.g., "Bananas are great for a pre-workout energy boost").
-
-    Structure your response using markdown with clear headings (like '## Item Name') and bullet points ('*'). Keep the tone encouraging and easy to understand.
-    `;
-
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_API_KEY });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
+        const response = await fetch('/api/get-health-tips', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ itemList }),
         });
-        setHealthTips(response.text);
-    } catch (error) {
-        console.error("Error generating health tips:", error);
-        let errorMessage = "Sorry, I couldn't generate tips at the moment. Please check your connection and try again.";
-        if (error instanceof Error && error.message.toLowerCase().includes('api key')) {
-          errorMessage = "Could not connect to the AI service. The API key might be missing or invalid in the application's configuration.";
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'An unknown server error occurred.');
         }
+
+        setHealthTips(data.tips);
+    } catch (error) {
+        console.error("Error fetching health tips:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
         setTipsError(errorMessage);
     } finally {
         setIsGeneratingTips(false);
@@ -312,7 +294,6 @@ export default function App(): React.ReactNode {
         tips={healthTips}
         isLoading={isGeneratingTips}
         error={tipsError}
-        advisorMode={advisorMode}
        />
     </div>
   );
