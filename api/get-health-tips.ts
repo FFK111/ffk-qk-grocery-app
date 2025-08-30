@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 
 // This function signature is for Vercel Serverless Functions.
 // It uses a Request-like and Response-like object.
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).end(`Method ${req.method} Not Allowed`);
