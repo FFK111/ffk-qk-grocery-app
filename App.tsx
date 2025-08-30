@@ -27,9 +27,6 @@ type ModalState = {
   category?: string;
 };
 
-// This must be defined at the top level of the module.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export default function App(): React.ReactNode {
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
@@ -195,6 +192,7 @@ export default function App(): React.ReactNode {
     `;
 
     try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -202,7 +200,11 @@ export default function App(): React.ReactNode {
         setHealthTips(response.text);
     } catch (error) {
         console.error("Error generating health tips:", error);
-        setTipsError("Sorry, I couldn't generate tips at the moment. Please check your connection and try again.");
+        let errorMessage = "Sorry, I couldn't generate tips at the moment. Please check your connection and try again.";
+        if (error instanceof Error && error.message.toLowerCase().includes('api key')) {
+          errorMessage = "Could not connect to the AI service. The API key might be missing or invalid in the application's configuration.";
+        }
+        setTipsError(errorMessage);
     } finally {
         setIsGeneratingTips(false);
     }
