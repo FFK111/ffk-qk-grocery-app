@@ -1,18 +1,21 @@
-// Fix: Use firebase/compat/app for initialization to resolve module export errors.
-import firebase from 'firebase/compat/app';
-import {
-    getFirestore,
-    collection,
-    doc,
+// FIX: Rewritten to use the modern v9+ modular API, which is required by Firebase v12 and fixes the "blank screen" startup crash.
+// FIX: Switched to a namespace import for `firebase/app` to work around potential module resolution issues that prevent named imports from being found.
+import * as firebaseApp from 'firebase/app';
+import { 
+    getFirestore, 
+    collection, 
+    doc, 
     onSnapshot,
     setDoc,
     query,
     where,
     getDocs,
     writeBatch,
+    getDoc,
     deleteDoc,
-    getDoc
-} from "firebase/firestore";
+    type Firestore
+} from 'firebase/firestore';
+
 import type { GroceryItem, GroceryListInfo } from "./types";
 
 const firebaseConfig = {
@@ -24,9 +27,11 @@ const firebaseConfig = {
   appId: "1:442396361973:web:69ec493017e0373e5ff1bc"
 };
 
-// Fix: Use the compatibilty API for app initialization to prevent re-initialization on hot-reloads.
-const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
-const db = getFirestore(app);
+// --- Lazy & Safe Initialization ---
+// This prevents re-initialization during hot-reloads in development environments.
+// FIX: Updated to use the `firebaseApp` namespace for initialization functions and types.
+const app: firebaseApp.FirebaseApp = !firebaseApp.getApps().length ? firebaseApp.initializeApp(firebaseConfig) : firebaseApp.getApp();
+const db: Firestore = getFirestore(app);
 
 
 // --- Utils ---
@@ -44,6 +49,7 @@ export const subscribeToItems = (
     onUpdate: (items: GroceryItem[]) => void, 
     onError: (error: Error) => void
 ) => {
+  // FIX: Use Firebase v9+ modular API.
   const itemsCollectionRef = collection(db, "lists", listId, "items");
   const unsubscribe = onSnapshot(itemsCollectionRef, (querySnapshot) => {
     const items = querySnapshot.docs
@@ -59,17 +65,20 @@ export const subscribeToItems = (
 };
 
 export const addItemToFirestore = async (item: GroceryItem, listId: string): Promise<void> => {
+  // FIX: Use Firebase v9+ modular API.
   const itemDocRef = doc(db, "lists", listId, "items", item.id);
   await setDoc(itemDocRef, item);
 };
 
 export const togglePurchasedByName = async (listId: string, itemName: string, newStatus: boolean): Promise<void> => {
+    // FIX: Use Firebase v9+ modular API.
     const itemsCollectionRef = collection(db, "lists", listId, "items");
     const q = query(itemsCollectionRef, where("name", "==", itemName));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) return;
     
+    // FIX: Use Firebase v9+ modular API.
     const batch = writeBatch(db);
     querySnapshot.forEach(document => {
         batch.update(document.ref, { purchased: newStatus });
@@ -78,12 +87,14 @@ export const togglePurchasedByName = async (listId: string, itemName: string, ne
 };
 
 export const deleteItemsByName = async (listId: string, itemName: string): Promise<void> => {
+    // FIX: Use Firebase v9+ modular API.
     const itemsCollectionRef = collection(db, "lists", listId, "items");
     const q = query(itemsCollectionRef, where("name", "==", itemName));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) return;
 
+    // FIX: Use Firebase v9+ modular API.
     const batch = writeBatch(db);
     querySnapshot.forEach(document => {
         batch.delete(document.ref);
@@ -92,12 +103,14 @@ export const deleteItemsByName = async (listId: string, itemName: string): Promi
 }
 
 export const deletePurchasedItems = async (listId: string): Promise<void> => {
+    // FIX: Use Firebase v9+ modular API.
     const itemsCollectionRef = collection(db, "lists", listId, "items");
     const q = query(itemsCollectionRef, where("purchased", "==", true));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) return;
 
+    // FIX: Use Firebase v9+ modular API.
     const batch = writeBatch(db);
     querySnapshot.forEach(document => {
         batch.delete(document.ref);
@@ -107,6 +120,7 @@ export const deletePurchasedItems = async (listId: string): Promise<void> => {
 
 // --- List Management ---
 export const getPublicLists = async (): Promise<GroceryListInfo[]> => {
+    // FIX: Use Firebase v9+ modular API.
     const listsCollectionRef = collection(db, "lists");
     const querySnapshot = await getDocs(listsCollectionRef);
     return querySnapshot.docs
@@ -123,13 +137,15 @@ export const createList = async (listName: string, pin: string, date: string): P
     const listId = listName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (!listId) throw new Error("Invalid list name. Use letters and numbers.");
 
+    // FIX: Use Firebase v9+ modular API.
     const listDocRef = doc(db, "lists", listId);
     const docSnap = await getDoc(listDocRef);
-    if (docSnap.exists()) {
+    if (docSnap.exists()) { // FIX: Use exists() method
         throw new Error("This list name is already taken. Please choose another.");
     }
 
     const pinHash = await hashPin(pin);
+    // FIX: Use Firebase v9+ modular API.
     await setDoc(listDocRef, {
         name: listName.trim(),
         pinHash,
@@ -141,10 +157,11 @@ export const createList = async (listName: string, pin: string, date: string): P
 };
 
 export const verifyListPin = async (listId: string, pin: string): Promise<boolean> => {
+    // FIX: Use Firebase v9+ modular API.
     const listDocRef = doc(db, "lists", listId);
     const docSnap = await getDoc(listDocRef);
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists()) { // FIX: Use exists() method
         throw new Error("List not found.");
     }
 
@@ -159,17 +176,20 @@ export const verifyListPin = async (listId: string, pin: string): Promise<boolea
 };
 
 export const deleteList = async (listId: string): Promise<void> => {
+    // FIX: Use Firebase v9+ modular API.
     const listDocRef = doc(db, "lists", listId);
     
     // Delete all items in the subcollection first
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
+    const itemsCollectionRef = collection(listDocRef, "items");
     const snapshot = await getDocs(itemsCollectionRef);
     if (!snapshot.empty) {
+        // FIX: Use Firebase v9+ modular API.
         const batch = writeBatch(db);
         snapshot.docs.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
     }
     
     // Then delete the list document itself
+    // FIX: Use Firebase v9+ modular API.
     await deleteDoc(listDocRef);
 };
