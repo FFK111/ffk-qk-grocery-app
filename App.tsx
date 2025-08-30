@@ -176,8 +176,8 @@ export default function App(): React.ReactNode {
     setTipsError(null);
     setIsHealthModalOpen(true);
     
-    // Proactively check for API key configuration.
-    if (!process.env.API_KEY) {
+    // Proactively check for API key configuration, using the Vercel-compatible name.
+    if (!process.env.REACT_APP_API_KEY) {
         setAdvisorMode('demo');
         return;
     }
@@ -202,7 +202,7 @@ export default function App(): React.ReactNode {
     `;
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
