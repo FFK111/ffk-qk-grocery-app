@@ -38,6 +38,8 @@ export default function App(): React.ReactNode {
   const [healthTips, setHealthTips] = useState('');
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
   const [tipsError, setTipsError] = useState<string | null>(null);
+  const [advisorMode, setAdvisorMode] = useState<'live' | 'demo'>('live');
+
 
   useEffect(() => {
     if (!currentListId) return;
@@ -176,10 +178,11 @@ export default function App(): React.ReactNode {
     
     // Proactively check for API key configuration.
     if (!process.env.API_KEY) {
-        setTipsError("CONFIG_ERROR");
+        setAdvisorMode('demo');
         return;
     }
-
+    
+    setAdvisorMode('live');
     setIsGeneratingTips(true);
 
     const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
@@ -309,6 +312,7 @@ export default function App(): React.ReactNode {
         tips={healthTips}
         isLoading={isGeneratingTips}
         error={tipsError}
+        advisorMode={advisorMode}
        />
     </div>
   );
