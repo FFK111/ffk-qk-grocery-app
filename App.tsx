@@ -21,7 +21,6 @@ import {
 } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ListManager } from './components/ListManager';
-import { GoogleGenAI } from '@google/genai';
 
 type ModalState = {
   step: 'closed' | 'selectCategory' | 'addItem';
@@ -41,7 +40,7 @@ export default function App(): React.ReactNode {
   const [healthTips, setHealthTips] = useState('');
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
   const [tipsError, setTipsError] = useState<string | null>(null);
-  const [advisorMode, setAdvisorMode] = useState<AdvisorMode>('demo');
+  const [advisorMode, setAdvisorMode] = useState<AdvisorMode>('live');
 
 
   useEffect(() => {
@@ -179,48 +178,39 @@ export default function App(): React.ReactNode {
     setTipsError(null);
     setIsHealthModalOpen(true);
     setIsGeneratingTips(true);
-
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.warn("API_KEY not found. Running Health Advisor in Demo Mode.");
-      setAdvisorMode('demo');
-      setIsGeneratingTips(false);
-      return;
-    }
-    setAdvisorMode('live');
+    setAdvisorMode('live'); // Assume live mode, backend will handle key check
 
     const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
-
-    const prompt = `
-      You are a "Health & Wellness Advisor".
-      Analyze the following grocery list: ${itemList}.
-
-      Based on this list, provide brief and simple health tips in tailored bullet points. Your advice should be based on generally accepted, reliable health information. Do not provide medical advice.
-
-      For key items on the list, please provide:
-      1.  **Key Health Benefits**: What are the main positive effects of consuming this item?
-      2.  **Consumption Tips & Precautions**: Any advice on preparation, consumption, or potential precautions.
-      3.  **Optimal Consumption Time**: Suggest when it might be best to eat the item for maximum benefit (e.g., "Bananas are great for a pre-workout energy boost").
-
-      Structure your response using markdown with clear headings (like '## Item Name') and bullet points ('*'). Keep the tone encouraging and easy to understand.
-    `;
-
+    
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
+        const response = await fetch('/api/get-health-tips', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ itemList }),
+        });
 
-      const tips = response.text;
-      setHealthTips(tips);
+        const data = await response.json();
+
+        if (!response.ok) {
+            // Check for our specific server-side error for missing API key
+            if (response.status === 412 && data.error === 'API_KEY_MISSING') {
+                console.warn("API_KEY not found on server. Running Health Advisor in Demo Mode.");
+                setAdvisorMode('demo');
+            } else {
+                throw new Error(data.error || `Request failed with status ${response.status}`);
+            }
+        } else {
+            setHealthTips(data.tips);
+        }
 
     } catch (error) {
-      console.error("Error fetching health tips:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
-      setTipsError(`Could not connect to the AI service. The service may be down. Details: ${errorMessage}`);
+        console.error("Error fetching health tips:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+        setTipsError(`Could not connect to the AI service. The service may be down or there was a network error. Details: ${errorMessage}`);
     } finally {
-      setIsGeneratingTips(false);
+        setIsGeneratingTips(false);
     }
   };
 
