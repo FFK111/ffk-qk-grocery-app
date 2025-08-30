@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { GroceryList } from './components/GroceryList';
 import { AddItemModal } from './components/AddItemModal';
 import { CategorySelectorModal } from './components/CategorySelectorModal';
 import { ProgressBar } from './components/ProgressBar';
+import { SmartShopperModal } from './components/SmartShopperModal';
 import { PlusIcon } from './components/icons/PlusIcon';
+import { SparklesIcon } from './components/icons/SparklesIcon';
 import type { GroceryItem, NewGroceryItem } from './types';
 import { PREDEFINED_GROCERIES } from './constants';
 import {
@@ -18,18 +21,26 @@ import {
 } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ListManager } from './components/ListManager';
-import { useEffect, useMemo } from 'react';
 
 type ModalState = {
   step: 'closed' | 'selectCategory' | 'addItem';
   category?: string;
 };
 
+// This must be defined at the top level of the module.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 export default function App(): React.ReactNode {
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [isInitialSyncing, setIsInitialSyncing] = useState(true);
   const [modalState, setModalState] = useState<ModalState>({ step: 'closed' });
   const [currentListId, setCurrentListId] = useLocalStorage<string | null>('currentListId', null);
+  
+  // State for Health & Wellness Advisor
+  const [isHealthModalOpen, setIsHealthModalOpen] = useState(false);
+  const [healthTips, setHealthTips] = useState('');
+  const [isGeneratingTips, setIsGeneratingTips] = useState(false);
+  const [tipsError, setTipsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentListId) return;
@@ -156,6 +167,47 @@ export default function App(): React.ReactNode {
     return Object.entries(grouped).map(([name, data]) => ({ name, ...data }));
   }, [items]);
 
+  const handleGetHealthTips = async () => {
+    if (aggregatedItems.length === 0) {
+        alert("Your shopping list is empty. Add some items to get health tips!");
+        return;
+    }
+
+    setIsHealthModalOpen(true);
+    setIsGeneratingTips(true);
+    setHealthTips('');
+    setTipsError(null);
+
+    const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
+
+    const prompt = `
+    You are a "Health & Wellness Advisor".
+    Analyze the following grocery list: ${itemList}.
+
+    Based on this list, provide brief and simple health tips in tailored bullet points. Your advice should be based on generally accepted, reliable health information. Do not provide medical advice.
+
+    For key items on the list, please provide:
+    1.  **Key Health Benefits**: What are the main positive effects of consuming this item?
+    2.  **Consumption Tips & Precautions**: Any advice on preparation, consumption, or potential precautions.
+    3.  **Optimal Consumption Time**: Suggest when it might be best to eat the item for maximum benefit (e.g., "Bananas are great for a pre-workout energy boost").
+
+    Structure your response using markdown with clear headings (like '## Item Name') and bullet points ('*'). Keep the tone encouraging and easy to understand.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        setHealthTips(response.text);
+    } catch (error) {
+        console.error("Error generating health tips:", error);
+        setTipsError("Sorry, I couldn't generate tips at the moment. Please check your connection and try again.");
+    } finally {
+        setIsGeneratingTips(false);
+    }
+  };
+
   const categorizedItems = useMemo(() => {
     const categories: { [key: string]: typeof aggregatedItems } = {};
     aggregatedItems.forEach(item => {
@@ -202,6 +254,14 @@ export default function App(): React.ReactNode {
                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed shadow-md">
                     Clear Completed
                 </button>
+                <button 
+                    onClick={handleGetHealthTips}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md"
+                    aria-label="Get health and wellness tips"
+                >
+                    <SparklesIcon className="w-5 h-5" />
+                    Get Health Tips
+                </button>
             </div>
               <GroceryList categorizedItems={categorizedItems} onToggleItem={toggleItemPurchased} onDeleteItem={handleDeleteItem} />
             </div>
@@ -233,6 +293,14 @@ export default function App(): React.ReactNode {
           onGoBack={() => setModalState({ step: 'selectCategory' })}
         />
       )}
+      
+      <SmartShopperModal
+        isOpen={isHealthModalOpen}
+        onClose={() => setIsHealthModalOpen(false)}
+        tips={healthTips}
+        isLoading={isGeneratingTips}
+        error={tipsError}
+       />
     </div>
   );
 }

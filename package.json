@@ -13,7 +13,8 @@
     "react-dom": "^19.1.1",
     "firebase": "^12.1.0",
     "@firebase/firestore": "^4.9.1",
-    "@firebase/app": "^0.14.2"
+    "@firebase/app": "^0.14.2",
+    "@google/genai": "^0.15.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
