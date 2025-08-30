@@ -21,7 +21,6 @@ import {
 } from './firebase';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ListManager } from './components/ListManager';
-import { GoogleGenAI } from '@google/genai';
 
 type ModalState = {
   step: 'closed' | 'selectCategory' | 'addItem';
@@ -178,44 +177,38 @@ export default function App(): React.ReactNode {
     setHealthTips('');
     setTipsError(null);
     setIsHealthModalOpen(true);
-
-    const apiKey = process.env.API_KEY;
-
-    if (!apiKey) {
-      console.warn("API_KEY not found. Running Health Advisor in Demo Mode.");
-      setAdvisorMode('demo');
-      return;
-    }
-    
-    setAdvisorMode('live');
     setIsGeneratingTips(true);
+    setAdvisorMode('live'); // Optimistically set to live
 
     const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
-    const prompt = `
-      You are a "Health & Wellness Advisor".
-      Analyze the following grocery list: ${itemList}.
-
-      Based on this list, provide brief and simple health tips in tailored bullet points. Your advice should be based on generally accepted, reliable health information. Do not provide medical advice.
-
-      For key items on the list, please provide:
-      1.  **Key Health Benefits**: What are the main positive effects of consuming this item?
-      2.  **Consumption Tips & Precautions**: Any advice on preparation, consumption, or potential precautions.
-      3.  **Optimal Consumption Time**: Suggest when it might be best to eat the item for maximum benefit (e.g., "Bananas are great for a pre-workout energy boost").
-
-      Structure your response using markdown with clear headings (like '## Item Name') and bullet points ('*'). Keep the tone encouraging and easy to understand.
-    `;
 
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
+      const apiResponse = await fetch('/api/get-health-tips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ itemList }),
       });
-      setHealthTips(response.text);
+
+      if (apiResponse.status === 412) {
+        // Server is missing API key, switch to demo mode
+        console.warn("API_KEY not found on server. Running Health Advisor in Demo Mode.");
+        setAdvisorMode('demo');
+        return; // Exit here, demo content will be shown by the modal
+      }
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        throw new Error(errorData.error || `Request failed with status ${apiResponse.status}`);
+      }
+
+      const data = await apiResponse.json();
+      setHealthTips(data.tips);
     } catch (error) {
-      console.error("Error calling Gemini API:", error);
+      console.error("Error fetching health tips:", error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
-      setTipsError(`Could not connect to the AI service. The API key might be invalid or the service may be down. Details: ${errorMessage}`);
+      setTipsError(`Could not connect to the AI service. The service may be down. Details: ${errorMessage}`);
     } finally {
       setIsGeneratingTips(false);
     }
