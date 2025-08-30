@@ -179,10 +179,10 @@ export default function App(): React.ReactNode {
     setTipsError(null);
     setIsHealthModalOpen(true);
 
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.REACT_APP_API_KEY;
 
     if (!apiKey) {
-      console.warn("API_KEY not found. Running Health Advisor in Demo Mode.");
+      console.warn("REACT_APP_API_KEY not found. Running Health Advisor in Demo Mode.");
       setAdvisorMode('demo');
       return;
     }
