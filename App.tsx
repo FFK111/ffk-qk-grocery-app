@@ -41,6 +41,7 @@ export default function App(): React.ReactNode {
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
   const [tipsError, setTipsError] = useState<string | null>(null);
   const [advisorMode, setAdvisorMode] = useState<AdvisorMode>('live');
+  const [isApiKeyConfigured, setIsApiKeyConfigured] = useState<boolean | null>(null);
 
 
   useEffect(() => {
@@ -58,6 +59,25 @@ export default function App(): React.ReactNode {
 
     return () => unsubscribe();
   }, [currentListId]);
+
+  useEffect(() => {
+    const checkApiConfig = async () => {
+        try {
+            const response = await fetch('/api/check-config');
+            const data = await response.json();
+            if (response.ok) {
+                setIsApiKeyConfigured(data.isConfigured);
+            } else {
+                console.warn("Could not verify API key configuration. Assuming it's not set.");
+                setIsApiKeyConfigured(false);
+            }
+        } catch (error) {
+            console.error("Failed to fetch API configuration status:", error);
+            setIsApiKeyConfigured(false);
+        }
+    };
+    checkApiConfig();
+  }, []);
 
   const addItem = async (newItem: NewGroceryItem) => {
     if (!currentListId) return;
@@ -177,8 +197,16 @@ export default function App(): React.ReactNode {
     setHealthTips('');
     setTipsError(null);
     setIsHealthModalOpen(true);
+
+    if (isApiKeyConfigured === false) {
+        console.warn("API Key not configured. Running Health Advisor in Demo Mode.");
+        setAdvisorMode('demo');
+        setIsGeneratingTips(false);
+        return;
+    }
+
     setIsGeneratingTips(true);
-    setAdvisorMode('live'); // Assume live mode, backend will handle key check
+    setAdvisorMode('live');
 
     const itemList = aggregatedItems.map(item => `${item.name} (${item.totalQuantity} ${item.unit})`).join(', ');
     
@@ -194,9 +222,8 @@ export default function App(): React.ReactNode {
         const data = await response.json();
 
         if (!response.ok) {
-            // Check for our specific server-side error for missing API key
             if (response.status === 412 && data.error === 'API_KEY_MISSING') {
-                console.warn("API_KEY not found on server. Running Health Advisor in Demo Mode.");
+                console.warn("API_KEY not found on server (fallback check). Running Health Advisor in Demo Mode.");
                 setAdvisorMode('demo');
             } else {
                 throw new Error(data.error || `Request failed with status ${response.status}`);
@@ -262,11 +289,12 @@ export default function App(): React.ReactNode {
                 </button>
                 <button 
                     onClick={handleGetHealthTips}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md"
+                    disabled={isApiKeyConfigured === null}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md disabled:bg-green-300 disabled:cursor-wait"
                     aria-label="Get health and wellness tips"
                 >
                     <SparklesIcon className="w-5 h-5" />
-                    Get Health Tips
+                    {isApiKeyConfigured === null ? 'Checking AI...' : 'Get Health Tips'}
                 </button>
             </div>
               <GroceryList categorizedItems={categorizedItems} onToggleItem={toggleItemPurchased} onDeleteItem={handleDeleteItem} />
