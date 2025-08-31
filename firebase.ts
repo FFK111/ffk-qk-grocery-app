@@ -1,19 +1,5 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { 
-    getFirestore, 
-    collection, 
-    onSnapshot,
-    doc,
-    setDoc,
-    query,
-    where,
-    getDocs,
-    writeBatch,
-    getDoc,
-    deleteDoc,
-    type Firestore,
-    type Unsubscribe
-} from 'firebase/firestore';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 
 import type { GroceryItem, GroceryListInfo } from "./types";
 
@@ -27,8 +13,10 @@ const firebaseConfig = {
 };
 
 // --- Initialization ---
-const app: FirebaseApp = initializeApp(firebaseConfig);
-const db: Firestore = getFirestore(app);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
 
 
 // --- Utils ---
@@ -45,9 +33,9 @@ export const subscribeToItems = (
     listId: string, 
     onUpdate: (items: GroceryItem[]) => void, 
     onError: (error: Error) => void
-): Unsubscribe => {
-  const itemsCollectionRef = collection(db, "lists", listId, "items");
-  const unsubscribe = onSnapshot(itemsCollectionRef, (querySnapshot) => {
+): (() => void) => {
+  const itemsCollectionRef = db.collection("lists").doc(listId).collection("items");
+  return itemsCollectionRef.onSnapshot((querySnapshot) => {
     const items = querySnapshot.docs
         .map(doc => doc.data())
         .filter(data => data && typeof data.id === 'string' && typeof data.name === 'string')
@@ -57,22 +45,19 @@ export const subscribeToItems = (
     console.error("Error subscribing to items:", error);
     onError(error);
   });
-  return unsubscribe;
 };
 
 export const addItemToFirestore = async (item: GroceryItem, listId: string): Promise<void> => {
-  const itemDocRef = doc(db, "lists", listId, "items", item.id);
-  await setDoc(itemDocRef, item);
+  await db.collection("lists").doc(listId).collection("items").doc(item.id).set(item);
 };
 
 export const togglePurchasedByName = async (listId: string, itemName: string, newStatus: boolean): Promise<void> => {
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
-    const q = query(itemsCollectionRef, where("name", "==", itemName));
-    const querySnapshot = await getDocs(q);
+    const itemsQuery = db.collection("lists").doc(listId).collection("items").where("name", "==", itemName);
+    const querySnapshot = await itemsQuery.get();
     
     if (querySnapshot.empty) return;
     
-    const batch = writeBatch(db);
+    const batch = db.batch();
     querySnapshot.forEach(document => {
         batch.update(document.ref, { purchased: newStatus });
     });
@@ -80,13 +65,12 @@ export const togglePurchasedByName = async (listId: string, itemName: string, ne
 };
 
 export const deleteItemsByName = async (listId: string, itemName: string): Promise<void> => {
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
-    const q = query(itemsCollectionRef, where("name", "==", itemName));
-    const querySnapshot = await getDocs(q);
+    const itemsQuery = db.collection("lists").doc(listId).collection("items").where("name", "==", itemName);
+    const querySnapshot = await itemsQuery.get();
 
     if (querySnapshot.empty) return;
 
-    const batch = writeBatch(db);
+    const batch = db.batch();
     querySnapshot.forEach(document => {
         batch.delete(document.ref);
     });
@@ -94,13 +78,12 @@ export const deleteItemsByName = async (listId: string, itemName: string): Promi
 }
 
 export const deletePurchasedItems = async (listId: string): Promise<void> => {
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
-    const q = query(itemsCollectionRef, where("purchased", "==", true));
-    const querySnapshot = await getDocs(q);
+    const itemsQuery = db.collection("lists").doc(listId).collection("items").where("purchased", "==", true);
+    const querySnapshot = await itemsQuery.get();
     
     if (querySnapshot.empty) return;
 
-    const batch = writeBatch(db);
+    const batch = db.batch();
     querySnapshot.forEach(document => {
         batch.delete(document.ref);
     });
@@ -109,8 +92,7 @@ export const deletePurchasedItems = async (listId: string): Promise<void> => {
 
 // --- List Management ---
 export const getPublicLists = async (): Promise<GroceryListInfo[]> => {
-    const listsCollectionRef = collection(db, "lists");
-    const querySnapshot = await getDocs(listsCollectionRef);
+    const querySnapshot = await db.collection("lists").get();
     return querySnapshot.docs
       .map(doc => ({
           id: doc.id,
@@ -125,14 +107,14 @@ export const createList = async (listName: string, pin: string, date: string): P
     const listId = listName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (!listId) throw new Error("Invalid list name. Use letters and numbers.");
 
-    const listDocRef = doc(db, "lists", listId);
-    const docSnap = await getDoc(listDocRef);
-    if (docSnap.exists()) {
+    const listDocRef = db.collection("lists").doc(listId);
+    const docSnap = await listDocRef.get();
+    if (docSnap.exists) {
         throw new Error("This list name is already taken. Please choose another.");
     }
 
     const pinHash = await hashPin(pin);
-    await setDoc(listDocRef, {
+    await listDocRef.set({
         name: listName.trim(),
         pinHash,
         date,
@@ -143,10 +125,10 @@ export const createList = async (listName: string, pin: string, date: string): P
 };
 
 export const verifyListPin = async (listId: string, pin:string): Promise<boolean> => {
-    const listDocRef = doc(db, "lists", listId);
-    const docSnap = await getDoc(listDocRef);
+    const listDocRef = db.collection("lists").doc(listId);
+    const docSnap = await listDocRef.get();
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
         throw new Error("List not found.");
     }
 
@@ -161,17 +143,16 @@ export const verifyListPin = async (listId: string, pin:string): Promise<boolean
 };
 
 export const deleteList = async (listId: string): Promise<void> => {
-    const listDocRef = doc(db, "lists", listId);
+    const listDocRef = db.collection("lists").doc(listId);
     
     // Delete all items in the subcollection first
-    const itemsCollectionRef = collection(db, "lists", listId, "items");
-    const snapshot = await getDocs(itemsCollectionRef);
+    const snapshot = await listDocRef.collection("items").get();
     if (!snapshot.empty) {
-        const batch = writeBatch(db);
+        const batch = db.batch();
         snapshot.docs.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
     }
     
     // Then delete the list document itself
-    await deleteDoc(listDocRef);
+    await listDocRef.delete();
 };
